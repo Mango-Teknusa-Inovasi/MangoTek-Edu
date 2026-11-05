@@ -5,7 +5,7 @@ import SchoolDiorama from './SchoolDiorama';
 import { Laptop, Tablet } from './DeviceModels';
 import type { RenderQuality, StoryInteraction } from './story-types';
 
-const settle = (current: number, target: number, delta: number) => { const next = MathUtils.damp(current, target, 7, Math.min(delta, .05)); return Math.abs(next - target) < .0005 ? target : next; };
+const settle = (current: number, target: number, delta: number) => { const next = MathUtils.damp(current, target, 7, delta); return Math.abs(next - target) < .0005 ? target : next; };
 const phase = (p: number, start: number, end: number) => MathUtils.smoothstep(p, start, end);
 interface SceneProps { progress: RefObject<number>; interaction: RefObject<StoryInteraction>; quality: RenderQuality; visible: boolean; onReady: () => void; onLost: () => void }
 function Scene({ progress, interaction, quality }: Pick<SceneProps, 'progress' | 'interaction' | 'quality'>) {

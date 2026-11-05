@@ -59,7 +59,7 @@ function Objects({ kind, control, onReady, onLost }: Pick<Props, 'kind' | 'contr
     return () => { canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); canvas.removeEventListener('pointerup', up); canvas.removeEventListener('pointercancel', up); canvas.removeEventListener('lostpointercapture', up); canvas.removeEventListener('webglcontextlost', lost); };
   }, [gl, control]);
   useFrame((_, delta) => {
-    const d = Math.min(delta, .05);
+    const d = delta;
     value.current = MathUtils.damp(value.current, control.current.expanded ? 1 : 0, 5, d);
     const t = value.current;
     if (rig.current) { rig.current.rotation.y = MathUtils.damp(rig.current.rotation.y, -.22 + control.current.rotation + control.current.scroll * .18, 6, d); gl.domElement.dataset.rotation = rig.current.rotation.y.toFixed(3); }
