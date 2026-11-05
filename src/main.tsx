@@ -9,6 +9,8 @@ import type {PortalContent,DocumentRecord} from './cms/schema';
 const App=lazy(()=>import('./App'));
 const Office=lazy(()=>import('./cms/Office'));
 const News=lazy(()=>import('./cms/News'));
+const Products=lazy(()=>import('./cms/Products'));
+const ProductPreview=lazy(()=>import('./cms/Products').then(m=>({default:m.ProductView})));
 const ArticlePreview=lazy(()=>import('./cms/News').then(m=>({default:m.ArticleView})));
 function Root(){
  const [content,setContent]=useState<PortalContent|null>(null),[preview,setPreview]=useState<DocumentRecord|null>(null),[error,setError]=useState('');
@@ -17,6 +19,6 @@ function Root(){
  if(office)return <Suspense fallback={<p className="loading-page">Memuat office…</p>}><Office/></Suspense>;
  if(error)return <main className="loading-page"><h1>Portal belum dapat dimuat</h1><p role="alert">{error}</p><button onClick={()=>location.reload()}>Coba lagi</button></main>;
  if(!content||(previewId&&!preview))return <p className="loading-page" role="status">Memuat portal…</p>;
- return <PortalProvider content={preview?.kind==='portal'?preview.draft as PortalContent:content}>{preview&&<div className="preview-banner">Pratinjau draf — belum diterbitkan. <a href="/office">Kembali ke office</a></div>}<Suspense fallback={<p className="loading-page">Memuat halaman…</p>}>{preview?.kind==='article'?<main className="container news-page"><ArticlePreview article={preview.draft as any}/></main>:location.pathname.startsWith('/berita')?<News/>:<App/>}</Suspense></PortalProvider>;
+ return <PortalProvider content={preview?.kind==='portal'?preview.draft as PortalContent:content}>{preview&&<div className="preview-banner">Pratinjau draf — belum diterbitkan. <a href="/office">Kembali ke office</a></div>}<Suspense fallback={<p className="loading-page">Memuat halaman…</p>}>{preview?.kind==='product'?<main className="container news-page"><ProductPreview product={preview.draft as any}/></main>:preview?.kind==='article'?<main className="container news-page"><ArticlePreview article={preview.draft as any}/></main>:location.pathname.startsWith('/produk')?<Products/>:location.pathname.startsWith('/berita')?<News/>:<App/>}</Suspense></PortalProvider>;
 }
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><Root/></React.StrictMode>);

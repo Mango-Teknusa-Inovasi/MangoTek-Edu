@@ -45,7 +45,7 @@ Setup creates a local `.env` without overwriting an existing file. The administr
 The release workflow publishes the application image to:
 
 ```text
-ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.1.0
+ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.2.0
 ```
 
 Use a version tag or digest for deployments. The `latest` tag follows stable releases. The image targets Linux AMD64; other platforms can build from source.
@@ -95,6 +95,7 @@ CI checks TypeScript, production builds, browser behavior and accessibility, all
 | [Architecture](docs/ARCHITECTURE.md) | Application structure, content flow, storage, and API boundaries |
 | [Office guide](docs/OFFICE.md) | Editing, publishing, media, and consultation reports |
 | [Release process](docs/RELEASING.md) | Versioning, CI gates, packages, and release assets |
+| [Search and portfolio](docs/SEO.md) | SEO, sitemap, social previews, machine-readable content, and products |
 | [Contributing](CONTRIBUTING.md) | Local development and pull request expectations |
 | [Security policy](SECURITY.md) | Supported releases and private vulnerability reports |
 | [Changelog](CHANGELOG.md) | User-visible changes by release |

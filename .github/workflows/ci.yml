@@ -28,6 +28,7 @@ jobs:
       - run: npm run build
       - run: npm run db:migrate
       - run: npm run test:api
+      - run: npm run test:seo
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - name: Upload browser evidence

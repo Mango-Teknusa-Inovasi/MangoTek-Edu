@@ -46,7 +46,7 @@ To use a published image, create `compose.image.yaml`:
 ```yaml
 services:
   app:
-    image: ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.1.0
+    image: ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.2.0
 ```
 
 Then run:

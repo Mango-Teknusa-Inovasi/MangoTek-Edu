@@ -10,6 +10,8 @@ import { resolve } from "node:path";
 import sharp from "sharp";
 import { z } from "zod";
 import { db, now } from "./db";
+import { registerPublicPages } from "./public-pages";
+import { shell } from "./seo";
 import {
   documentRecord as doc,
   documents,
@@ -20,6 +22,7 @@ import { token, digest, hashPassword, checkPassword } from "./auth";
 import {
   portalSchema,
   articleSchema,
+  productSchema,
   inquirySchema,
   serviceIds,
   type Article,
@@ -96,6 +99,7 @@ app.use(
       imgSrc: ["'self'", "data:", "blob:"],
       fontSrc: ["'self'"],
       connectSrc: ["'self'"],
+      mediaSrc: ["'self'", "https:"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],
@@ -113,6 +117,7 @@ app.use(
 );
 app.use("/api/*", async (c, next) => {
   c.header("Cache-Control", "no-store");
+  c.header("X-Robots-Tag", "noindex, nofollow");
   if (!["GET", "HEAD"].includes(c.req.method)) {
     const requestOrigin = c.req.header("origin");
     if (requestOrigin && requestOrigin !== origin)
@@ -214,10 +219,10 @@ app.post("/api/office/logout", async (c) => {
 });
 app.get("/api/portal", async (c) => {
   const row = await db("documents").where({ id: "portal" }).first();
-  return c.json(JSON.parse(row.published));
+  return c.json(portalSchema.parse(JSON.parse(row.published)));
 });
 async function news(query: Record<string, string>) {
-  const page = Math.max(1, Math.min(10000, Number(query.page) || 1));
+  const page = Math.max(1, Math.min(10000, Math.floor(Number(query.page) || 1)));
   const rows = await db("documents")
     .where({ kind: "article" })
     .whereNotNull("published")
@@ -243,7 +248,7 @@ async function news(query: Record<string, string>) {
 app.get("/api/news", async (c) => c.json(await news(c.req.query())));
 app.get("/api/news/:slug", async (c) => {
   const row = await db("documents")
-    .where({ published_slug: c.req.param("slug") })
+    .where({ published_slug: c.req.param("slug"), kind: "article" })
     .whereNotNull("published")
     .first();
   if (!row) throw fail("Berita tidak ditemukan.", 404);
@@ -257,14 +262,16 @@ app.get("/api/office/documents", async (c) =>
   c.json((await documents().orderBy("updated_at", "desc")).map(doc)),
 );
 app.post("/api/office/documents", async (c) => {
-  const value = articleSchema.parse(await c.req.json());
+  const body = await c.req.json();
+  const kind = body.kind === "product" ? "product" : "article";
+  const value = (kind === "product" ? productSchema : articleSchema).parse(body);
   const id = randomUUID();
   await db.transaction(async (trx) => {
     await lockContent(trx);
     await verifyMedia(value, trx);
     await documents(trx).insert({
       id,
-      kind: "article",
+      kind,
       revision: 1,
       status: "draft",
       draft: JSON.stringify(value),
@@ -286,10 +293,10 @@ app.put("/api/office/documents/:id", async (c) => {
     const value =
       row.kind === "portal"
         ? portalSchema.parse(body.content)
-        : articleSchema.parse(body.content);
+        : row.kind === "product" ? productSchema.parse(body.content) : articleSchema.parse(body.content);
     if (row.kind === "portal" && c.get("user").role !== "admin") {
-      const old = JSON.parse(row.draft);
-      for (const field of ["identity", "theme", "navigation"])
+      const old = portalSchema.parse(JSON.parse(row.draft)) as any;
+      for (const field of ["identity", "theme", "navigation", "seo"])
         if (
           JSON.stringify(old[field]) !== JSON.stringify((value as any)[field])
         )
@@ -303,7 +310,7 @@ app.put("/api/office/documents/:id", async (c) => {
         revision: body.revision + 1,
         status: "draft",
         updated_at: now(),
-        ...(row.kind === "article" ? { slug: (value as Article).slug } : {}),
+        ...(row.kind !== "portal" ? { slug: (value as Article).slug } : {}),
       });
     if (!changed)
       throw fail(
@@ -644,70 +651,11 @@ app.get("/uploads/:file", async (c) => {
     return c.notFound();
   }
 });
-const escape = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (x) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        x
-      ]!,
-  );
-async function shell(
-  title = "MangoTek Edu",
-  description = "Digitalisasi pendidikan dan infrastruktur sekolah.",
-  content = "",
-  image = "",
-) {
-  let html = await readFile("dist/index.html", "utf8");
-  html = html
-    .replace(/<title>.*?<\/title>/s, `<title>${escape(title)}</title>`)
-    .replace(/<meta name="description"[^>]*>/g, "");
-  return html
-    .replace(
-      "</head>",
-      `<meta name="description" content="${escape(description)}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}">${image ? `<meta property="og:image" content="${escape(origin + image)}">` : ""}</head>`,
-    )
-    .replace('<div id="root"></div>', `<div id="root">${content}</div>`);
-}
-app.get("/berita/:slug", async (c) => {
-  const r = await db("documents")
-    .where({ published_slug: c.req.param("slug") })
-    .whereNotNull("published")
-    .first();
-  if (!r)
-    return c.html(
-      await shell(
-        "Berita tidak ditemukan",
-        "",
-        '<main><h1>Berita tidak ditemukan</h1><a href="/berita">Kembali ke berita</a></main>',
-      ),
-      404,
-    );
-  const a = JSON.parse(r.published) as Article;
-  return c.html(
-    await shell(
-      a.seoTitle || a.title,
-      a.seoDescription || a.summary,
-      `<main><article><h1>${escape(a.title)}</h1><p>${escape(a.summary)}</p>${a.blocks.map((b) => `<${b.type === "heading" ? "h2" : b.type === "quote" ? "blockquote" : "p"}>${escape(b.text)}</${b.type === "heading" ? "h2" : b.type === "quote" ? "blockquote" : "p"}>`).join("")}</article></main>`,
-      a.cover,
-    ),
-  );
-});
-app.get("/berita", async (c) => {
-  const r = await news(c.req.query());
-  return c.html(
-    await shell(
-      "Berita | MangoTek Edu",
-      "Kabar dan kegiatan MangoTek Edu.",
-      `<main><h1>Berita</h1>${r.items.map((a) => `<article><h2><a href="/berita/${a.slug}">${escape(a.title)}</a></h2><p>${escape(a.summary)}</p></article>`).join("")}</main>`,
-    ),
-  );
-});
-app.get("/", async (c) => c.html(await shell()));
+registerPublicPages(app);
 app.get("/office", async (c) => {
   c.header("Cache-Control", "no-store");
   c.header("X-Robots-Tag", "noindex, nofollow");
-  return c.html(await shell("Office | MangoTek Edu"));
+  return c.html(await shell({ title: "Office | MangoTek Edu", path: "/office", noindex: true }));
 });
 app.get("/office/preview/:id", async (c) => {
   c.header("Cache-Control", "no-store");
@@ -718,7 +666,7 @@ app.get("/office/preview/:id", async (c) => {
     .first();
   if (!s || !(await db("users").where({ id: s.user_id, active: true }).first()))
     return c.redirect("/office");
-  return c.html(await shell("Pratinjau konten | MangoTek Edu"));
+  return c.html(await shell({ title: "Pratinjau konten | MangoTek Edu", path: c.req.path, noindex: true }));
 });
 app.use("*", serveStatic({ root: "./dist" }));
 app.notFound((c) => c.text("Halaman tidak ditemukan", 404));

@@ -9,6 +9,30 @@ const asset = z
     /^\/(?:uploads\/[a-f0-9-]+\.webp|brand\/[a-z-]+\.svg|[a-z-]+\.(?:png|svg))$/,
   );
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const httpsUrl = z.url().refine((v) => {
+  try { const u = new URL(v); return u.protocol === "https:" && !u.username && !u.password; }
+  catch { return false; }
+}, "Gunakan URL HTTPS tanpa kredensial");
+export const defaultSeo = {
+  title: "MangoTek Edu | Digitalisasi Sekolah K–12",
+  description: "MangoTek Edu mendukung digitalisasi sekolah K–12 melalui pembelajaran digital, administrasi, jaringan, perangkat kelas, dan pendampingan di Jawa Timur, Indonesia.",
+  socialImage: "/social-card.png",
+  socialImageAlt: "MangoTek Edu, sekolah terhubung dan pendidikan bertumbuh, dengan ilustrasi sekolah digital.",
+  contactEmail: "billing@ppti.me",
+  region: "Jawa Timur",
+  country: "Indonesia",
+  regionCode: "ID-JI",
+};
+const seoSchema = z.object({
+  title: z.string().trim().min(1).max(180),
+  description: z.string().trim().min(1).max(350),
+  socialImage: asset,
+  socialImageAlt: z.string().trim().min(1).max(250),
+  contactEmail: z.email(),
+  region: label,
+  country: label,
+  regionCode: z.string().regex(/^[A-Z]{2}-[A-Z0-9]{1,3}$/),
+});
 export const serviceIds = [
   "learning",
   "administration",
@@ -31,6 +55,14 @@ export const sectionIds = [
   "kontak",
 ] as const;
 export const portalSchema = z.object({
+  seo: seoSchema.default(defaultSeo),
+  showcase: z.object({
+    visible: z.boolean(),
+    title: label,
+    intro: text,
+    trustTitle: label,
+    partners: z.array(z.object({ name: label, logo: asset, url: z.union([httpsUrl, z.literal("")]) })).max(30),
+  }).default({ visible: true, title: "Produk dan karya kami", intro: "Kenali produk dan penerapan teknologi yang telah kami kerjakan.", trustTitle: "Telah dipercaya oleh", partners: [] }),
   identity: z.object({
     name: label,
     logo: asset,
@@ -50,6 +82,7 @@ export const portalSchema = z.object({
           "#faq",
           "#kontak",
           "/berita",
+          "/produk",
         ]),
       }),
     )
@@ -120,6 +153,8 @@ export const portalSchema = z.object({
 });
 export type PortalContent = z.infer<typeof portalSchema>;
 export const defaultPortal: PortalContent = {
+  seo: defaultSeo,
+  showcase: { visible: true, title: "Produk dan karya kami", intro: "Kenali produk dan penerapan teknologi yang telah kami kerjakan.", trustTitle: "Telah dipercaya oleh", partners: [] },
   identity: {
     name: "MangoTek Edu",
     logo: "/brand/mangotek-edu.svg",
@@ -212,6 +247,22 @@ export const articleSchema = z
     "Teks alternatif sampul wajib diisi",
   );
 export type Article = z.infer<typeof articleSchema>;
+export const productSchema = z.object({
+  title: label,
+  slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(180),
+  summary: text,
+  category: label,
+  cover: asset,
+  coverAlt: label,
+  blocks: z.array(z.object({ type: z.enum(["paragraph", "heading", "quote"]), text })).min(1).max(100),
+  screenshots: z.array(z.object({ image: asset, alt: label, caption: z.string().max(500) })).max(20),
+  videoUrl: z.union([httpsUrl.refine(v => { try { return /\.(mp4|webm)$/i.test(new URL(v).pathname); } catch { return false; } }, "Gunakan tautan langsung video MP4 atau WebM"), z.literal("")]),
+  videoTranscript: z.string().max(15000),
+  websiteUrl: z.union([httpsUrl, z.literal("")]),
+  seoTitle: z.string().max(180),
+  seoDescription: z.string().max(350),
+}).refine(v => !v.videoUrl || v.videoTranscript.trim().length > 0, "Tambahkan transkrip atau deskripsi lengkap video");
+export type Product = z.infer<typeof productSchema>;
 export const inquirySchema = z
   .object({
     name: label,
@@ -228,9 +279,9 @@ export const inquirySchema = z
     (v) => !!v.email || /^[+\d ()-]{8,30}$/.test(v.phone),
     "Isi email atau nomor WhatsApp yang valid",
   );
-export type DocumentRecord<T = PortalContent | Article> = {
+export type DocumentRecord<T = PortalContent | Article | Product> = {
   id: string;
-  kind: "portal" | "article";
+  kind: "portal" | "article" | "product";
   revision: number;
   status: "draft" | "review" | "published";
   draft: T;

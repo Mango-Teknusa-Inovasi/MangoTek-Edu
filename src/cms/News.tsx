@@ -46,11 +46,12 @@ export function LatestNews() {
     </section>
   ) : null;
 }
-export function ArticleView({ article }: { article: Article }) {
+export function ArticleView({ article }: { article: Article & { publishedAt?: string } }) {
   return (
     <article className="news-article">
       <p className="news-category">{article.category}</p>
       <h1>{article.title}</h1>
+      {article.publishedAt && <time dateTime={article.publishedAt}>{new Date(article.publishedAt).toLocaleDateString("id-ID", { dateStyle: "long", timeZone: "Asia/Jakarta" })}</time>}
       <p className="news-lead">{article.summary}</p>
       {article.cover && <img src={article.cover} alt={article.coverAlt} />}
       <div className="article-body">
@@ -143,6 +144,7 @@ export default function News() {
       <footer className="container news-footer">
         © {new Date().getFullYear()} {portal.identity.name} · Part of{" "}
         {portal.identity.parentName}
+        <p>{portal.seo.region}, {portal.seo.country} · <a href={`mailto:${portal.seo.contactEmail}`}>{portal.seo.contactEmail}</a></p>
       </footer>
     </>
   );

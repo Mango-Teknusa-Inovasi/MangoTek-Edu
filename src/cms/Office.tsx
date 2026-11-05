@@ -5,6 +5,7 @@ import {
   mediaKinds,
   type DocumentRecord,
   type Article,
+  type Product,
   type PortalContent,
 } from "./schema";
 type User = {
@@ -16,6 +17,25 @@ type User = {
   revision: number;
 };
 const labels: Record<string, string> = {
+  seo: "SEO, kontak, dan wilayah",
+  socialImage: "Gambar berbagi sosial",
+  socialImageAlt: "Deskripsi gambar sosial",
+  contactEmail: "Email pemasaran",
+  region: "Provinsi atau wilayah",
+  country: "Negara",
+  regionCode: "Kode wilayah ISO (contoh ID-JI)",
+  showcase: "Portofolio dan organisasi yang mempercayai kami",
+  intro: "Pengantar",
+  trustTitle: "Judul bagian kepercayaan",
+  partners: "Organisasi (isi hanya dengan izin publikasi)",
+  url: "Website organisasi (HTTPS, opsional)",
+  screenshots: "Galeri tangkapan layar",
+  image: "Gambar",
+  alt: "Teks alternatif",
+  caption: "Keterangan gambar",
+  videoUrl: "Tautan langsung video MP4/WebM (HTTPS, opsional)",
+  videoTranscript: "Transkrip dan deskripsi lengkap video",
+  websiteUrl: "Website produk (HTTPS, opsional)",
   identity: "Identitas",
   name: "Nama",
   logo: "Logo Edu",
@@ -62,7 +82,7 @@ const labels: Record<string, string> = {
   a: "Jawaban",
   notes: "Catatan",
   summary: "Ringkasan",
-  slug: "Alamat berita",
+  slug: "Slug halaman",
   cover: "Gambar sampul",
   coverAlt: "Teks alternatif sampul",
   category: "Kategori",
@@ -106,6 +126,8 @@ function Field({
           "blocks",
           "paragraphs",
           "needs",
+          "screenshots",
+          "partners",
         ].includes(key);
     const add = () => {
       const templates: any = {
@@ -113,6 +135,8 @@ function Field({
         steps: { title: "Langkah baru", text: "" },
         faqs: { q: "Pertanyaan baru", a: "" },
         blocks: { type: "paragraph", text: "" },
+        screenshots: { image: "", alt: "", caption: "" },
+        partners: { name: "", logo: "", url: "" },
       };
       onChange([...value, templates[key] ?? ""]);
     };
@@ -218,6 +242,7 @@ function Field({
       "#faq",
       "#kontak",
       "/berita",
+      "/produk",
     ];
   if (key === "media" || path.startsWith("media.")) choices = mediaKinds;
   if (choices)
@@ -225,6 +250,7 @@ function Field({
       <label>
         {caption}
         <select
+          aria-label={caption}
           disabled={disabled}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -235,11 +261,12 @@ function Field({
         </select>
       </label>
     );
-  if (["logo", "parentLogo", "cover"].includes(key))
+  if (["logo", "parentLogo", "cover", "image", "socialImage"].includes(key))
     return (
       <label>
         {caption}
         <select
+          aria-label={caption}
           disabled={disabled}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -337,7 +364,7 @@ function ContentEditor({
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
-  const article = record.kind === "article",
+  const article = record.kind !== "portal",
     isNew = record.id === "new";
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -353,7 +380,7 @@ function ContentEditor({
     setBusy(true);
     try {
       if (isNew) {
-        await api("/api/office/documents", send("POST", draft));
+        await api("/api/office/documents", send("POST", { ...draft, kind: record.kind }));
         refresh();
       } else {
         const next = await api(
@@ -396,8 +423,8 @@ function ContentEditor({
   };
   const fields = Object.keys(draft).filter((k) =>
     article || settings
-      ? article || ["identity", "theme", "navigation"].includes(k)
-      : !["identity", "theme", "navigation"].includes(k),
+      ? article || ["identity", "theme", "navigation", "seo"].includes(k)
+      : !["identity", "theme", "navigation", "seo"].includes(k),
   );
   return (
     <div>
@@ -498,6 +525,11 @@ const blankArticle: Article = {
   blocks: [{ type: "paragraph", text: "" }],
   seoTitle: "",
   seoDescription: "",
+};
+const blankProduct: Product = {
+  title: "Produk baru", slug: "produk-baru", summary: "", category: "Produk pendidikan",
+  cover: "", coverAlt: "", blocks: [{ type: "paragraph", text: "" }], screenshots: [],
+  videoUrl: "", videoTranscript: "", websiteUrl: "", seoTitle: "", seoDescription: "",
 };
 function Inquiries({
   report,
@@ -932,20 +964,22 @@ export default function Office() {
     ? [
         "Konten Portal",
         "Berita",
+        "Produk",
         "Media",
         "Konsultasi",
         "Laporan",
         "Pengguna",
         "Pengaturan",
       ]
-    : ["Konten Portal", "Berita", "Media"];
+    : ["Konten Portal", "Berita", "Produk", "Media"];
+  const documentKind = section === "Produk" ? "product" : "article";
   const record =
-    section === "Berita"
+    (section === "Berita" || section === "Produk")
       ? newArticle
         ? ({
             id: "new",
-            kind: "article",
-            draft: blankArticle,
+            kind: documentKind,
+            draft: documentKind === "product" ? blankProduct : blankArticle,
             published: null,
             status: "draft",
             revision: 0,
@@ -1025,7 +1059,7 @@ export default function Office() {
               refresh={load}
             />
           )}
-        {section === "Berita" &&
+        {(section === "Berita" || section === "Produk") &&
           (record ? (
             <>
               <button
@@ -1036,7 +1070,7 @@ export default function Office() {
                   load();
                 }}
               >
-                ← Daftar berita
+                ← Daftar {section.toLowerCase()}
               </button>
               <ContentEditor
                 key={record.id}
@@ -1054,20 +1088,20 @@ export default function Office() {
           ) : (
             <>
               <div className="office-heading">
-                <p>Draf dan berita yang telah diterbitkan.</p>
+                <p>Draf dan {section.toLowerCase()} yang telah diterbitkan.</p>
                 <button
                   className="button button-green"
                   onClick={() => setNewArticle(true)}
                 >
-                  Tulis berita
+                  {section === "Produk" ? "Tambah produk" : "Tulis berita"}
                 </button>
               </div>
               <div className="office-list">
-                {docs.filter((d) => d.kind === "article").length === 0 && (
-                  <p>Belum ada berita. Mulai dengan menulis draf pertama.</p>
+                {docs.filter((d) => d.kind === documentKind).length === 0 && (
+                  <p>Belum ada {section.toLowerCase()}. Mulai dengan membuat draf pertama.</p>
                 )}
                 {docs
-                  .filter((d) => d.kind === "article")
+                  .filter((d) => d.kind === documentKind)
                   .map((d) => (
                     <button
                       className="list-row"

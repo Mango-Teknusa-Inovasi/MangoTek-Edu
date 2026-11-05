@@ -7,6 +7,7 @@ import { Icon, type IconName } from './components/Icon';
 import { type ServiceId } from './data/content';
 import { usePortal } from './cms/PortalContext';
 import { LatestNews } from './cms/News';
+import { PortfolioSection } from './cms/Products';
 
 const serviceIcons: Record<ServiceId,IconName> = {learning:'book',administration:'administration',network:'network',devices:'device',support:'support'};
 
@@ -80,18 +81,18 @@ export default function App() {
 
       <LatestNews/>
       <section id="kontak" className="contact-section"><div className="container"><div className="contact-panel"><div className="contact-copy"><AnimatedContent distance={20}><h2>{portal.headings.contact}</h2><p>{portal.headings.contactIntro}</p><button className="button button-mango" onClick={consult}>{portal.headings.cta} <Icon name="diagonal" size={18}/></button></AnimatedContent></div><div className="contact-media"><InteractiveMedia kind={portal.media.contact} dark/></div></div></div></section>
-    </OrderedSections></main>
+    </OrderedSections><PortfolioSection/></main>
     <footer className="site-footer">
       <div className="container">
         <div className="footer-top">
-          <div className="footer-identity"><Brand footer/><p>{portal.identity.tagline}</p></div>
+          <div className="footer-identity"><Brand footer/><p>{portal.identity.tagline}</p><p>{portal.seo.region}, {portal.seo.country}<br/><a href={`mailto:${portal.seo.contactEmail}`}>{portal.seo.contactEmail}</a></p></div>
           <div className="footer-parent">
             <img src={portal.identity.parentLogo} alt={portal.identity.parentName} width="112" height="52"/>
             <span>Part of<strong>{portal.identity.parentName}</strong></span>
           </div>
         </div>
         <div className="footer-bottom">
-          <nav aria-label="Navigasi footer">{navItems.map(item => <a key={item.href} href={item.href}>{item.label}</a>)}</nav>
+          <nav aria-label="Navigasi footer">{navItems.map(item => <a key={item.href} href={item.href}>{item.label}</a>)}{!navItems.some(item=>item.href==='/produk')&&<a href="/produk">Produk &amp; Portofolio</a>}</nav>
           <div className="footer-meta"><span>© {new Date().getFullYear()} {portal.identity.name}</span><a href="#beranda">Kembali ke atas <Icon name="arrow" size={16}/></a></div>
         </div>
       </div>

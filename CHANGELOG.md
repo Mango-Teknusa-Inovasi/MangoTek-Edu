@@ -6,6 +6,17 @@ Notable changes are recorded here. Releases use Semantic Versioning; while the p
 
 No changes yet.
 
+## [0.2.0] - 2026-11-05
+
+### Added
+
+- Server-readable public home content, canonical and social metadata, organization/service/FAQ structured data, and publication-aware news metadata.
+- Dynamic XML sitemap, robots.txt, llms.txt, llms-full.txt, and Markdown representations of public content.
+- A branded 1200 × 630 social card, editable SEO/contact/region settings, and the public marketing contact.
+- Product and portfolio publishing with screenshots, external video links, transcripts, protected previews, and homepage work samples.
+- An initially empty, editable trust-logo section that appears only after real entries are published.
+- Automated SEO/publication-isolation checks and responsive product browser tests.
+
 ## [0.1.0] - 2026-11-05
 
 ### Added
