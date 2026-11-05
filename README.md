@@ -92,6 +92,7 @@ CI checks TypeScript, production builds, browser behavior and accessibility, all
 | Guide | Purpose |
 | --- | --- |
 | [Deployment](docs/DEPLOYMENT.md) | Configuration, Docker, updates, backup, and recovery |
+| [Portainer](docs/PORTAINER.md) | Web Editor stack on port 3654 with external MariaDB |
 | [Architecture](docs/ARCHITECTURE.md) | Application structure, content flow, storage, and API boundaries |
 | [Office guide](docs/OFFICE.md) | Editing, publishing, media, and consultation reports |
 | [Release process](docs/RELEASING.md) | Versioning, CI gates, packages, and release assets |

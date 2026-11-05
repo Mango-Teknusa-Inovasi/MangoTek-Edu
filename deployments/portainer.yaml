@@ -1,0 +1,38 @@
+# Portainer Web Editor stack for a Docker Standalone environment.
+# Set APP_ORIGIN and DB_PASSWORD in Portainer's Environment variables section.
+services:
+  app:
+    image: ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.1.0
+    restart: unless-stopped
+    init: true
+    ports:
+      - "0.0.0.0:3654:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN to http://YOUR_HOST_IP:3654}
+      TRUST_PROXY_HOPS: "0"
+      DB_DRIVER: mariadb
+      DB_HOST: ${DB_HOST:-10.1.0.18}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-portalppti}
+      DB_USER: ${DB_USER:-portalppti}
+      DB_PASSWORD: ${DB_PASSWORD:?Set the database password in Portainer}
+      UPLOAD_DIR: /app/data/uploads
+    volumes:
+      - portal_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      start_period: 60s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  portal_data:
