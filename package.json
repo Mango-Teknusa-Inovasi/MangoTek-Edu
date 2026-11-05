@@ -1,0 +1,66 @@
+{
+  "name": "mangotek-portal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "start": "tsx server.ts",
+    "preview": "tsx server.ts",
+    "typecheck": "tsc -b",
+    "test": "playwright test",
+    "setup": "tsx scripts/manage.ts setup",
+    "db:migrate": "tsx scripts/manage.ts migrate",
+    "admin:create": "tsx scripts/manage.ts admin",
+    "admin:reset": "tsx scripts/manage.ts reset",
+    "backup:sqlite": "tsx scripts/manage.ts backup",
+    "dev:api": "tsx watch server.ts",
+    "test:api": "tsx scripts/test-api.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@gsap/react": "^2.1.2",
+    "@hono/node-server": "^2.1.6",
+    "@inquirer/prompts": "^8.7.5",
+    "@react-three/fiber": "^9.8.2",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.9",
+    "gsap": "^3.15.1",
+    "hono": "^4.13.16",
+    "knex": "^3.3.0",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.187.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "description": "An education portal and editorial workspace with interactive 3D media, news publishing, and school consultation management.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mango-Teknusa-Inovasi/MangoTek-Edu.git"
+  },
+  "homepage": "https://github.com/Mango-Teknusa-Inovasi/MangoTek-Edu#readme",
+  "bugs": {
+    "url": "https://github.com/Mango-Teknusa-Inovasi/MangoTek-Edu/issues"
+  },
+  "engines": {
+    "node": ">=24 <27"
+  }
+}

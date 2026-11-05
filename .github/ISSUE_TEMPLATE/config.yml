@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Mango-Teknusa-Inovasi/MangoTek-Edu/security/advisories/new
+    about: Report sensitive security issues privately.
+  - name: Questions and support
+    url: https://github.com/Mango-Teknusa-Inovasi/MangoTek-Edu/discussions
+    about: Ask about installation, usage, and development.

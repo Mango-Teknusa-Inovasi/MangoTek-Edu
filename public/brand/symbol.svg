@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title">
+  <title id="title">MangoTek Edu</title>
+  <path fill="#244b3a" fill-rule="evenodd" d="M24 232V136C24 83 67 40 120 40H224V136C224 189 181 232 128 232ZM64 184V96H88L124 132L160 96H184V184H156V140L124 172L92 140V184Z"/>
+  <path fill="#244b3a" d="M160 28C160 12 184 4 216 4C216 24 192 36 160 28Z"/>
+</svg>

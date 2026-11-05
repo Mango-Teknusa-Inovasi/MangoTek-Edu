@@ -1,0 +1,26 @@
+# MangoTek Edu: visual direction
+
+Approved direction: a public K–12 education portal for school and foundation decision makers. Warm ivory, dark green, mango accent, Plus Jakarta Sans. The user selected concept C (Benih) after reviewing three logo constructions. The M cutout sits inside a seed silhouette with a small leaf; the parent Mango logo appears separately in the footer.
+
+Design read: a school brought to life, followed by the digital tools that support its daily work. ENERGY 3 / RHYTHM 3 / MOTION 4. The main action submits school needs to the portal for administrator follow-up.
+
+- Identity: standalone outlined SVG wordmark for MangoTek Edu, light version, favicon symbol. The seed and leaf connect learning and growth to the Mango parent without splicing its wordmark.
+- Palette: ivory establishes a welcoming school setting. The stage turns deep green as devices enter, giving their screens clear focus. Mango marks actions and the small leaf in the new logo. Scene materials use restrained natural shades for grass, wood, walls, and skin.
+- Typography: Plus Jakarta Sans follows the approved direction. Oversized headlines introduce one idea per chapter; small chapter labels provide orientation in a long scene.
+- Composition: a school and headline share the desktop stage. Tablets and phones stack text above the model to keep controls and moving devices clear. The rest of the page uses editorial columns, service tabs, a four-step approach, and FAQ.
+- Illustration: a prominent central main building flanked by two lower classroom wings, mango trees, solar panels, network antenna, classroom display, courtyard, benches, and pupils explain the intended education setting. Device screens are illustrative learning content, not screenshots of an existing commercial product.
+- Motion: native scrolling drives a single ScrollTrigger progress value with 0.45-second scrub smoothing shared by the scene, background, and chapter selection. The school recedes, a laptop rises and opens, tablet and phone enter, and the composition settles. The user rotation rig is separate and returns to its canonical angle during the transition. Pupils walk on curved courtyard routes with distance-based gait, opposite arm swings, knee flexion, and small body movement. The motion control pauses pupils, trees, and the flag. Facade-local window coordinates avoid openings extending beyond the walls.
+- Input: desktop mouse drag rotates the school through 360 degrees, with limited vertical tilt. Mouse wheel remains page scroll. Objects are directly draggable and focusable. Arrow keys rotate, Home resets, and Space pauses school movement. Local media uses click, tap, or Enter to activate its action. Horizontal touch rotates while native vertical gestures remain page scrolling.
+- Resilience: lazy scene loading uses an actual rendered poster. WebGL/module failure and reduced motion use a normal static narrative. Offscreen and hidden-tab rendering pauses. Quality adapts to screen width.
+- Spacing and panels: a shared container aligns editorial sections. The transition chapter has no backing panels: the shared stage background eases from ivory to green and text ink adapts, with its color change softened by a short transition. Controls have a clear boundary; no unrelated badges or decorative grids.
+- Icons and arrows: existing service icons identify categories. Rotation arrows describe direction; link arrows indicate the next destination. There are no invented proof points, partners, or testimonials.
+
+References: INAgov for service grouping; the user-provided Apple display page for scale, pacing, and shifts in focus. The Three.js geometry and device choreography are original to this project. React Bits SplitText introduces the first heading, and AnimatedContent reveals later sections.
+
+Content status: five service categories and the four-step approach remain draft, visibly described as an initial overview. Consultation now saves requests to the selected database. Office manages drafts, publication, media, and reports; public copy does not expose implementation status.
+
+Revision requested by the user: interactive 3D belongs throughout the page. Introduction shows a school network; each service tab has a corresponding model; the approach section separates implementation layers; FAQ shows support equipment; consultation returns to learning devices. Each model has direct pointer/keyboard interaction and an accessible description; visible guides, captions, and button rows were removed at the user’s request. Local canvases mount only in view, share geometry/materials and the renderer bundle, and use matching static posters in reduced-motion or failure states.
+
+All hero edges now use the same safe-area calculation as the header container. The school canvas stays within this area at 375/768/1440/1920 widths. The initial scroll stage is shorter so the rest of the page becomes part of the visual experience sooner. The user-approved identity and service content remain unchanged.
+
+Office uses a compact editorial workspace: a persistent navigation column on desktop and wrapping navigation on mobile, structured section editors, clear draft/publication states, and restrained tables/lists for operational reports. The public visual identity and native 3D interactions remain intact.

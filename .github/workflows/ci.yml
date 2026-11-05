@@ -1,0 +1,101 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    name: Build and browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      DB_DRIVER: sqlite
+      SQLITE_PATH: /tmp/mangotek-ci-test.sqlite
+      UPLOAD_DIR: /tmp/mangotek-ci-uploads
+      APP_ORIGIN: http://127.0.0.1:3000
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run db:migrate
+      - run: npm run test:api
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-evidence
+          path: |
+            test-results/
+            artifacts/**/*.png
+          retention-days: 7
+          if-no-files-found: ignore
+  databases:
+    name: API tests (${{ matrix.driver }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: postgres
+            image: postgres:17-bookworm
+            port: 5432
+            health: pg_isready -U mangotek_ci -d mangotek_test
+          - driver: mariadb
+            image: mariadb:11.4
+            port: 3306
+            health: healthcheck.sh --connect --innodb_initialized
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          POSTGRES_DB: mangotek_test
+          POSTGRES_USER: mangotek_ci
+          POSTGRES_PASSWORD: ci-only-disposable-password
+          MARIADB_DATABASE: mangotek_test
+          MARIADB_USER: mangotek_ci
+          MARIADB_PASSWORD: ci-only-disposable-password
+          MARIADB_RANDOM_ROOT_PASSWORD: '1'
+        ports:
+          - ${{ matrix.port }}:${{ matrix.port }}
+        options: >-
+          --health-cmd="${{ matrix.health }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      DB_DRIVER: ${{ matrix.driver }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: ${{ matrix.port }}
+      DB_USER: mangotek_ci
+      DB_PASSWORD: ci-only-disposable-password
+      DB_NAME: mangotek_test
+      UPLOAD_DIR: /tmp/mangotek-ci-uploads
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:api
+  container:
+    name: Docker build and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: docker build -t mangotek-edu:ci .
+      - run: docker run --rm -e DB_DRIVER=sqlite -e SQLITE_PATH=/tmp/mangotek-container-test.sqlite -e UPLOAD_DIR=/tmp/uploads mangotek-edu:ci npm run test:api
