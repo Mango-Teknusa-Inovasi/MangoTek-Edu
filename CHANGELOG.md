@@ -6,6 +6,22 @@ Notable changes are recorded here. Releases use Semantic Versioning; while the p
 
 No changes yet.
 
+## [0.2.1] - 2026-11-05
+
+### Changed
+
+- Office opens with real content totals, task shortcuts, and recent revisions.
+- Portal editing uses a section navigator and compact repeatable items; news and products group related fields.
+- Sticky save controls, visible progress and publication states, protected navigation, and retryable errors make editorial work easier.
+- Content lists support title/category search and publication status filters.
+- Responsive office navigation, keyboard focus, and reduced-motion transitions improve daily use.
+- Stable releases explicitly publish the `latest` container tag, with Portainer update instructions.
+
+### Fixed
+
+- Saved document metadata is kept in sync when switching between portal content and settings.
+- Superseded consultation filter requests no longer replace newer results.
+
 ## [0.2.0] - 2026-11-05
 
 ### Added

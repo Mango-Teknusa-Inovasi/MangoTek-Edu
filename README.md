@@ -45,10 +45,10 @@ Setup creates a local `.env` without overwriting an existing file. The administr
 The release workflow publishes the application image to:
 
 ```text
-ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.2.0
+ghcr.io/mango-teknusa-inovasi/mangotek-edu:latest
 ```
 
-Use a version tag or digest for deployments. The `latest` tag follows stable releases. The image targets Linux AMD64; other platforms can build from source.
+The `latest` tag follows stable releases. In Portainer, choose **Pull latest image** when updating the stack; an unchanged tag does not download a new image automatically. Version tags and digests remain available for rollbacks. The image targets Linux AMD64; other platforms can build from source.
 
 For a local source build:
 

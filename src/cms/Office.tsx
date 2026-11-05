@@ -99,6 +99,50 @@ const statusLabels: Record<string, string> = {
   processing: "Diproses",
   done: "Selesai",
 };
+const sectionHelp: Record<string, string> = {
+  Ringkasan: "Mulai dari pekerjaan yang perlu Anda tangani hari ini.",
+  "Konten Portal": "Sunting satu bagian, simpan draf, lalu terbitkan saat siap.",
+  Berita: "Kelola kabar sekolah, kegiatan, dan artikel yang tampil di portal.",
+  Produk: "Tampilkan produk dan karya melalui cerita, gambar, dan video.",
+  Media: "Simpan gambar yang dapat digunakan kembali di seluruh portal.",
+  Konsultasi: "Baca kebutuhan sekolah dan catat tindak lanjutnya.",
+  Laporan: "Tinjau permintaan menurut periode, layanan, dan status.",
+  Pengguna: "Kelola akses admin dan editor organisasi Anda.",
+  Pengaturan: "Atur identitas, navigasi, warna, dan informasi pencarian.",
+};
+const fieldHelp: Record<string, string> = {
+  hero: "Judul pembuka, cerita digital, dan pengaturan gerakan.",
+  about: "Perkenalan organisasi dan dukungan untuk sekolah.",
+  headings: "Judul bagian dan ajakan yang tampil di beranda.",
+  services: "Deskripsi layanan dan contoh kebutuhan sekolah.",
+  steps: "Langkah kerja dari perencanaan hingga pendampingan.",
+  faqs: "Pertanyaan dan jawaban yang membantu pengunjung.",
+  showcase: "Pengantar portofolio dan logo organisasi dengan izin publikasi.",
+  sections: "Urutan dan visibilitas bagian setelah hero.",
+  media: "Pilihan objek 3D untuk setiap bagian portal.",
+  notes: "Catatan yang ditampilkan kepada pengunjung.",
+  identity: "Nama, logo, dan hubungan dengan organisasi induk.",
+  theme: "Warna dasar yang digunakan pada portal publik.",
+  navigation: "Label dan tujuan tautan pada menu portal.",
+  seo: "Judul pencarian, gambar sosial, kontak, dan wilayah layanan.",
+};
+const iconPaths: Record<string, string> = {
+  Ringkasan: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
+  "Konten Portal": "M3 4h18v16H3zM3 9h18M9 9v11",
+  Berita: "M5 3h14v18H5zM8 7h8M8 11h8M8 15h5",
+  Produk: "m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9",
+  Media: "M3 4h18v16H3zM3 16l6-6 5 5 3-3 4 4M16 8h.01",
+  Konsultasi: "M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5",
+  Laporan: "M4 3v18h17M9 16v-5M14 16V6M19 16V9",
+  Pengguna: "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-3.87",
+  Pengaturan: "M4 7h16M4 17h16M9 4v6M15 14v6",
+};
+function OfficeIcon({ name }: { name: string }) {
+  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={iconPaths[name] || iconPaths.Berita} /></svg>;
+}
+function StatusBadge({ status }: { status: string }) {
+  return <span className={`status-badge status-${status}`}>{statusLabels[status] || status}</span>;
+}
 function Field({
   value,
   onChange,
@@ -143,8 +187,11 @@ function Field({
     return (
       <fieldset className="editor-array" disabled={disabled}>
         <legend>{caption}</legend>
-        {value.map((v, i) => (
-          <div className="editor-item" key={i}>
+        {value.map((v, i) => {
+          const Item = v && typeof v === "object" ? "details" : "div";
+          const itemTitle = v && typeof v === "object" ? v.label || v.title || v.q || v.name || `${caption} ${i + 1}` : "";
+          return <Item className="editor-item" key={i} {...(Item === "details" ? {open: i === 0} : {})}>
+            {Item === "details" && <summary className="editor-item-summary">{itemTitle}</summary>}
             <div className="item-toolbar">
               <span>{i + 1}</span>
               {reorder && (
@@ -194,8 +241,8 @@ function Field({
               path={`${path}.${i}`}
               assets={assets}
             />
-          </div>
-        ))}
+          </Item>;
+        })}
         {!fixed && (
           <button type="button" onClick={add}>
             Tambah {caption.toLowerCase()}
@@ -351,19 +398,26 @@ function ContentEditor({
   settings,
   refresh,
   assets,
+  onDirtyChange,
+  onSaved,
 }: {
   record: DocumentRecord;
   admin: boolean;
   settings: boolean;
   refresh: () => void;
   assets: any[];
+  onDirtyChange: (dirty: boolean) => void;
+  onSaved: (record: DocumentRecord) => void;
 }) {
   const [draft, setDraft] = useState<any>(record.draft),
     [revision, setRevision] = useState(record.revision),
     [status, setStatus] = useState(record.status),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [failed, setFailed] = useState(false),
+    [activeField, setActiveField] = useState(settings ? "identity" : "hero");
+  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   const article = record.kind !== "portal",
     isNew = record.id === "new";
   useEffect(() => {
@@ -377,28 +431,34 @@ function ContentEditor({
   }, [dirty]);
   const save = async () => {
     setMessage("");
+    setFailed(false);
     setBusy(true);
     try {
       if (isNew) {
         await api("/api/office/documents", send("POST", { ...draft, kind: record.kind }));
+        setDirty(false);
+        onDirtyChange(false);
         refresh();
       } else {
         const next = await api(
           `/api/office/documents/${record.id}`,
           send("PUT", { revision, content: draft }),
         );
+        onSaved(next);
         setRevision(next.revision);
         setStatus(next.status);
         setDirty(false);
         setMessage("Draf tersimpan.");
       }
     } catch (e) {
+      setFailed(true);
       setMessage((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
   const action = async (action: string) => {
+    setFailed(false);
     setBusy(true);
     setMessage("");
     try {
@@ -406,6 +466,7 @@ function ContentEditor({
         `/api/office/documents/${record.id}/${action}`,
         send("POST", { revision }),
       );
+      onSaved(r);
       setRevision(r.revision);
       setStatus(r.status);
       setMessage(
@@ -413,25 +474,25 @@ function ContentEditor({
           ? "Konten telah diterbitkan."
           : action === "review"
             ? "Draf diajukan untuk ditinjau."
-            : "Berita ditarik dari publikasi.",
+            : "Konten ditarik dari publikasi.",
       );
     } catch (e) {
+      setFailed(true);
       setMessage((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
-  const fields = Object.keys(draft).filter((k) =>
+  const fieldOrder = ["identity", "theme", "navigation", "seo", "hero", "about", "headings", "services", "steps", "faqs", "showcase", "sections", "media", "notes"];
+  const fields = Object.keys(draft).sort((a, b) => fieldOrder.indexOf(a) - fieldOrder.indexOf(b)).filter((k) =>
     article || settings
       ? article || ["identity", "theme", "navigation", "seo"].includes(k)
       : !["identity", "theme", "navigation", "seo"].includes(k),
   );
   return (
-    <div>
+    <div className="content-editor" aria-busy={busy}>
       <div className="editor-status">
-        <span>
-          {statusLabels[status]} · Versi {revision}
-        </span>
+        <div className="editor-state"><StatusBadge status={status} /><span>Versi {revision}</span><span className={dirty ? "save-state is-dirty" : "save-state"}>{dirty ? "Modifikasi belum disimpan" : isNew ? "Belum disimpan" : "Draf tersimpan"}</span></div>
         {!isNew && (
           <a
             href={`/office/preview/${record.id}`}
@@ -445,35 +506,35 @@ function ContentEditor({
       <p className="field-help">
         Simpan perubahan sebagai draf sebelum meninjau atau menerbitkan.
       </p>
-      <form
+      <form className={article ? "document-editor-form" : "portal-editor-form"}
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
+        {!article && <nav className="editor-section-nav" aria-label="Bagian editor">
+          <span className="editor-nav-label">BAGIAN HALAMAN</span>
+          {fields.map(k => <button key={k} type="button" aria-current={activeField === k ? "true" : undefined} onClick={() => setActiveField(k)}>{labels[k] || k}<span aria-hidden="true">›</span></button>)}
+        </nav>}
         <fieldset disabled={busy} className="editor-fields">
-          {fields.map((k) => (
-            <details
-              className="editor-section"
-              key={k}
-              open={article || undefined}
-            >
-              <summary>{labels[k] || k}</summary>
-              <Field
-                path={k}
-                value={draft[k]}
-                onChange={(value) => {
-                  setDraft({ ...draft, [k]: value });
-                  setDirty(true);
-                }}
-                assets={assets}
-              />
-            </details>
+          {article ? [
+            { title: "Informasi utama", keys: ["title", "slug", "summary", "category"] },
+            { title: "Gambar dan media", keys: ["cover", "coverAlt", "screenshots", "videoUrl", "videoTranscript", "websiteUrl"] },
+            { title: "Isi halaman", keys: ["blocks"] },
+            { title: "Tampilan di pencarian", keys: ["seoTitle", "seoDescription"] },
+          ].map(group => <section className="editor-section" key={group.title}>
+            <div className="editor-section-heading"><h2>{group.title}</h2></div>
+            <div className="editor-group">{group.keys.filter(k => fields.includes(k)).map(k => <Field key={k} path={k} value={draft[k]} onChange={value => { setDraft({ ...draft, [k]: value }); setDirty(true); }} assets={assets} />)}</div>
+          </section>) : fields.filter(k => k === activeField).map((k) => (
+            <section className="editor-section" key={k} aria-labelledby={`editor-${k}`}>
+              <div className="editor-section-heading"><h2 id={`editor-${k}`}>{labels[k] || k}</h2>{fieldHelp[k] && <p>{fieldHelp[k]}</p>}</div>
+              <Field path={k} value={draft[k]} onChange={(value) => { setDraft({ ...draft, [k]: value }); setDirty(true); }} assets={assets} />
+            </section>
           ))}
         </fieldset>
-        <div className="editor-actions">
+        <div className="editor-actions editor-savebar">
           <button className="button button-green" disabled={busy}>
-            Simpan draf
+            {busy ? "Memproses…" : "Simpan draf"}
           </button>
           {!isNew && (
             <>
@@ -504,11 +565,11 @@ function ContentEditor({
               )}
             </>
           )}
-          {dirty && <span>Belum disimpan</span>}
+          <span className="savebar-hint">{dirty ? "Simpan draf untuk mengaktifkan publikasi." : "Perubahan tampil di portal setelah diterbitkan."}</span>
         </div>
       </form>
       {message && (
-        <p className="office-notice" role="status">
+        <p className={`office-notice editor-feedback ${failed ? "is-error" : "is-success"}`} role={failed ? "alert" : "status"}>
           {message}
         </p>
       )}
@@ -548,12 +609,14 @@ function Inquiries({
     [selected, setSelected] = useState<any>(null),
     [busy, setBusy] = useState(false);
   const query = new URLSearchParams(filters).toString();
-  const load = () =>
-    api(`/api/office/inquiries?${query}`)
+  const load = (signal?: AbortSignal) =>
+    api(`/api/office/inquiries?${query}`, { signal })
       .then(setRows)
-      .catch((e) => onError(e.message));
+      .catch((e) => { if (!signal?.aborted) onError(e.message); });
   useEffect(() => {
-    load();
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
   }, [query]);
   return (
     <>
@@ -661,7 +724,7 @@ function Inquiries({
                   })}
                 </small>
               </span>
-              <span>{statusLabels[r.status]}</span>
+              <StatusBadge status={r.status} />
             </button>
           ))
         )}
@@ -881,23 +944,55 @@ function Users({ onError }: { onError: (s: string) => void }) {
     </>
   );
 }
+function matchesDocument(d: DocumentRecord, kind: string, search: string, status: string) {
+  const content = d.draft as Article;
+  return d.kind === kind && (!status || d.status === status) &&
+    `${content.title} ${content.category}`.toLocaleLowerCase("id").includes(search.toLocaleLowerCase("id").trim());
+}
+function Overview({ docs, admin, name, navigate }: { docs: DocumentRecord[]; admin: boolean; name: string; navigate: (section: string) => void }) {
+  const content = docs.filter(d => d.kind !== "portal");
+  const review = docs.filter(d => d.status === "review");
+  const shortcuts = admin ? ["Konten Portal", "Berita", "Produk", "Konsultasi"] : ["Konten Portal", "Berita", "Produk", "Media"];
+  return <div className="office-overview">
+    <section className="workspace-welcome"><div><span className="office-kicker">MANGOTEK EDU · OFFICE</span><h2>Selamat bekerja, {name}.</h2><p>Rawat informasi portal dan bantu sekolah menemukan dukungan yang tepat.</p></div><a href="/" target="_blank" rel="noreferrer">Buka portal <span aria-hidden="true">↗</span></a></section>
+    <section className="workspace-metrics" aria-label="Ringkasan konten">
+      {[{label:"Berita",value:content.filter(d=>d.kind==="article").length,section:"Berita"},{label:"Produk & portofolio",value:content.filter(d=>d.kind==="product").length,section:"Produk"},{label:"Menunggu tinjauan",value:review.length,section:review[0]?.kind==="product"?"Produk":review[0]?.kind==="article"?"Berita":"Konten Portal"}].map(item=><button key={item.label} onClick={()=>navigate(item.section)}><span>{item.label}</span><strong>{item.value}</strong><span className="metric-link">Lihat konten <span aria-hidden="true">↗</span></span></button>)}
+    </section>
+    <section className="workspace-shortcuts"><h2>Apa yang ingin Anda kerjakan?</h2><div>{shortcuts.map(section=><button key={section} onClick={()=>navigate(section)}><OfficeIcon name={section}/><span><strong>{section}</strong><small>{sectionHelp[section]}</small></span><span aria-hidden="true">→</span></button>)}</div></section>
+    <section className="workspace-recent"><div className="office-heading"><div><h2>Konten terakhir diperbarui</h2><p>Draf tetap tersimpan untuk dilanjutkan kapan saja.</p></div></div>
+      <div className="office-list">{docs.slice(0,5).map(d=><button className="list-row" key={d.id} onClick={()=>navigate(d.kind==="portal"?"Konten Portal":d.kind==="product"?"Produk":"Berita")}><span><strong>{d.kind==="portal"?"Beranda MangoTek Edu":(d.draft as Article).title}</strong><small>{d.kind==="portal"?"Konten Portal":d.kind==="product"?"Produk":"Berita"}{d.updatedAt && ` · ${new Date(d.updatedAt).toLocaleDateString("id-ID", {day:"numeric",month:"short",year:"numeric", timeZone:"Asia/Jakarta"})}`}</small></span><StatusBadge status={d.status}/></button>)}</div>
+    </section>
+  </div>;
+}
 export default function Office() {
   const [session, setSession] = useState<{ user: User } | null>(null),
     [loading, setLoading] = useState(true),
-    [section, setSection] = useState("Konten Portal"),
+    [section, setSection] = useState("Ringkasan"),
     [message, setMessage] = useState(""),
     [docs, setDocs] = useState<DocumentRecord[]>([]),
     [assets, setAssets] = useState<any[]>([]),
     [selected, setSelected] = useState<string | null>(null),
     [newArticle, setNewArticle] = useState(false),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [dataLoading, setDataLoading] = useState(true),
+    [dirty, setDirty] = useState(false),
+    [search, setSearch] = useState(""),
+    [statusFilter, setStatusFilter] = useState("");
+  const navigate = (next: string) => {
+    if (next === section && !selected && !newArticle) return;
+    if (dirty && !window.confirm("Perubahan belum disimpan. Tinggalkan halaman ini?")) return;
+    setDirty(false); setSection(next); setSelected(null); setNewArticle(false);
+    setSearch(""); setStatusFilter(""); setMessage("");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
   const load = () =>
     Promise.all([api("/api/office/documents"), api("/api/office/media")])
       .then(([d, m]) => {
         setDocs(d);
         setAssets(m);
       })
-      .catch((e) => setMessage(e.message));
+      .catch((e) => setMessage(e.message))
+      .finally(() => setDataLoading(false));
   useEffect(() => {
     api("/api/office/session")
       .then(setSession)
@@ -962,6 +1057,7 @@ export default function Office() {
   const admin = session.user.role === "admin";
   const menu = admin
     ? [
+        "Ringkasan",
         "Konten Portal",
         "Berita",
         "Produk",
@@ -971,7 +1067,7 @@ export default function Office() {
         "Pengguna",
         "Pengaturan",
       ]
-    : ["Konten Portal", "Berita", "Produk", "Media"];
+    : ["Ringkasan", "Konten Portal", "Berita", "Produk", "Media"];
   const documentKind = section === "Produk" ? "product" : "article";
   const record =
     (section === "Berita" || section === "Produk")
@@ -997,21 +1093,15 @@ export default function Office() {
         <a href="/">
           <img src="/brand/mangotek-edu.svg" alt="MangoTek Edu" />
         </a>
-        <span className="office-label">OFFICE</span>
+        <span className="office-label">RUANG KERJA</span>
         <nav aria-label="Menu office">
           {menu.map((s) => (
             <button
               key={s}
               aria-current={section === s ? "page" : undefined}
-              onClick={() => {
-                setSection(s);
-                setSelected(null);
-                setNewArticle(false);
-                setMessage("");
-                load();
-              }}
+              onClick={() => navigate(s)}
             >
-              {s}
+              <OfficeIcon name={s} /><span>{s}</span>
             </button>
           ))}
         </nav>
@@ -1020,7 +1110,9 @@ export default function Office() {
           <span>{admin ? "Admin" : "Editor"}</span>
           <button
             onClick={async () => {
+              if (dirty && !window.confirm("Perubahan belum disimpan. Tetap keluar?")) return;
               try {
+                setDirty(false);
                 await api("/api/office/logout", send("POST"));
                 setSession(null);
                 setMessage("");
@@ -1033,11 +1125,12 @@ export default function Office() {
           </button>
         </div>
       </aside>
-      <main id="office-main" className="office-main">
+      <main id="office-main" className="office-main" aria-busy={dataLoading}>
         <header className="office-heading">
           <div>
             <p>MangoTek Edu</p>
             <h1>{section}</h1>
+            <p className="office-section-description">{sectionHelp[section]}</p>
           </div>
           <a href="/" target="_blank" rel="noreferrer">
             Lihat portal ↗
@@ -1048,15 +1141,19 @@ export default function Office() {
             {message}
           </p>
         )}
+        {dataLoading && <div className="office-loading" role="status">Memuat ruang kerja…</div>}
+        {section === "Ringkasan" && !dataLoading && <Overview docs={docs} admin={admin} name={session.user.name} navigate={navigate} />}
         {(section === "Konten Portal" || section === "Pengaturan") &&
           record && (
             <ContentEditor
-              key={`${section}-${record.revision}`}
+              key={`${section}-${record.id}`}
               record={record}
               assets={assets}
               admin={admin}
               settings={section === "Pengaturan"}
               refresh={load}
+              onDirtyChange={setDirty}
+              onSaved={saved => setDocs(current => current.map(d => d.id === saved.id ? saved : d))}
             />
           )}
         {(section === "Berita" || section === "Produk") &&
@@ -1065,6 +1162,8 @@ export default function Office() {
               <button
                 className="back-button"
                 onClick={() => {
+                  if (dirty && !window.confirm("Perubahan belum disimpan. Kembali ke daftar?")) return;
+                  setDirty(false);
                   setSelected(null);
                   setNewArticle(false);
                   load();
@@ -1078,6 +1177,8 @@ export default function Office() {
                 assets={assets}
                 admin={admin}
                 settings={false}
+                onDirtyChange={setDirty}
+              onSaved={saved => setDocs(current => current.map(d => d.id === saved.id ? saved : d))}
                 refresh={() => {
                   setNewArticle(false);
                   setSelected(null);
@@ -1096,12 +1197,16 @@ export default function Office() {
                   {section === "Produk" ? "Tambah produk" : "Tulis berita"}
                 </button>
               </div>
+              <div className="content-list-filters">
+                <label>Cari {section.toLowerCase()}<input type="search" placeholder="Judul atau kategori…" value={search} onChange={e => setSearch(e.target.value)} /></label>
+                <label>Status publikasi<select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">Semua status</option>{["draft", "review", "published"].map(s => <option key={s} value={s}>{statusLabels[s]}</option>)}</select></label>
+              </div>
               <div className="office-list">
-                {docs.filter((d) => d.kind === documentKind).length === 0 && (
-                  <p>Belum ada {section.toLowerCase()}. Mulai dengan membuat draf pertama.</p>
+                {docs.filter((d) => matchesDocument(d, documentKind, search, statusFilter)).length === 0 && (
+                  <div className="office-empty"><OfficeIcon name={section} /><h2>{search || statusFilter ? "Tidak ada hasil yang cocok" : `Belum ada ${section.toLowerCase()}`}</h2><p>{search || statusFilter ? "Coba kata pencarian atau status lain." : "Buat draf pertama. Konten hanya tampil di portal setelah diterbitkan."}</p></div>
                 )}
                 {docs
-                  .filter((d) => d.kind === documentKind)
+                  .filter((d) => matchesDocument(d, documentKind, search, statusFilter))
                   .map((d) => (
                     <button
                       className="list-row"
@@ -1112,7 +1217,7 @@ export default function Office() {
                         <strong>{(d.draft as Article).title}</strong>
                         <small>{(d.draft as Article).category}</small>
                       </span>
-                      <span>{statusLabels[d.status]}</span>
+                      <StatusBadge status={d.status} />
                     </button>
                   ))}
               </div>
@@ -1154,7 +1259,7 @@ export default function Office() {
                 />
               </label>
               <button className="button button-green" disabled={busy}>
-                Unggah gambar
+                {busy ? "Mengunggah…" : "Unggah gambar"}
               </button>
             </form>
             <div className="media-library">

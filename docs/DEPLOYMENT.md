@@ -46,7 +46,7 @@ To use a published image, create `compose.image.yaml`:
 ```yaml
 services:
   app:
-    image: ghcr.io/mango-teknusa-inovasi/mangotek-edu:0.2.0
+    image: ghcr.io/mango-teknusa-inovasi/mangotek-edu:latest
 ```
 
 Then run:
@@ -65,6 +65,8 @@ The app runs as a non-root user. The application port is bound to host loopback;
 The `portal_data` volume stores SQLite and uploaded images. PostgreSQL and MariaDB have separate named data volumes. Do not use `docker compose down -v` during upgrades: it deletes persistent volumes.
 
 ## Updates
+
+For Portainer deployments using `:latest`, open the stack editor and choose **Update the stack** with **Pull latest image** enabled. The tag follows stable releases; updating a tag does not restart an existing container automatically. Preserve the environment and named volumes. Keep the previously deployed version tag or digest for rollback.
 
 1. Stop new writes and create a consistent database/media backup.
 2. Record the current image digest and application version.
