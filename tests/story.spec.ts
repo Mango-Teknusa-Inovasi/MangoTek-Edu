@@ -9,7 +9,7 @@ async function scrollProgress(page: Page, progress: number) {
     const end = root.getBoundingClientRect().top + scrollY + root.clientHeight - innerHeight;
     window.scrollTo({ top: start + p * (end - start), behavior: 'instant' });
   }, progress);
-  await page.waitForTimeout(450);
+  await expect.poll(async () => Number(await page.locator('.story-stage').getAttribute('data-progress')), { timeout: 15000 }).toBeCloseTo(progress, 2);
 }
 async function load(page: Page) {
   await page.goto('/');
@@ -25,14 +25,16 @@ test('school drag, angle limits, keyboard rotation, reset and pause', async ({ p
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 750, box.y + box.height / 2 + 300, { steps: 20 });
   await page.mouse.up(); await page.waitForTimeout(600);
-  expect(Number(await canvas.getAttribute('data-yaw'))).toBeGreaterThan(5.5);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-yaw')), { timeout: 15000 }).toBeGreaterThan(5.5);
   expect(Number(await canvas.getAttribute('data-tilt'))).toBeLessThanOrEqual(.161);
   await page.locator('.story-visual').focus(); await page.keyboard.press('Home'); await page.waitForTimeout(900);
-  expect(Number(await canvas.getAttribute('data-yaw'))).toBeCloseTo(-.48, 1);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-yaw')), { timeout: 15000 }).toBeCloseTo(-.48, 1);
   await page.locator('.story-visual').focus(); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(600);
-  expect(Number(await canvas.getAttribute('data-yaw'))).toBeGreaterThan(.2);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-yaw')), { timeout: 15000 }).toBeGreaterThan(.2);
   await page.locator('.story-visual').focus(); await page.keyboard.press(' ');
   await page.mouse.move(box.x + 100, box.y + 150); await page.waitForTimeout(1500);
+  let previous = await canvas.screenshot();
+  await expect.poll(async () => { const current = await canvas.screenshot(); const settled = current.equals(previous); previous = current; return settled; }, { timeout: 15000 }).toBe(true);
   const before = await canvas.screenshot(); await page.waitForTimeout(250);
   expect((await canvas.screenshot()).equals(before)).toBe(true);
   await page.mouse.wheel(0, 500); await page.waitForTimeout(500);
@@ -100,7 +102,7 @@ test('mobile scene preserves native touch scrolling and rotation controls', asyn
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 100, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 200, y }] });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(600);
-  expect(Number(await canvas.getAttribute('data-yaw'))).toBeGreaterThan(.2);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-yaw')), { timeout: 15000 }).toBeGreaterThan(.2);
   await page.screenshot({ path: 'artifacts/story/mobile-short.png' });
   await context.close();
 });
