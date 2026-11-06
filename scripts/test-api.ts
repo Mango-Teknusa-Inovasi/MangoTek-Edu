@@ -243,6 +243,15 @@ try {
   response = await request("/api/office/media", "POST", form);
   assert.equal(response.status, 201);
   const media = await response.json();
+  assert.equal(media.width,20); assert.equal(media.height,20); assert.equal(media.name,"uji.png");
+  const delivered = await request(media.url,"GET",undefined,false);
+  assert.equal(delivered.status,200); assert.equal(delivered.headers.get("content-type"),"image/webp");
+  assert.equal((await sharp(Buffer.from(await delivered.arrayBuffer())).metadata()).width,20);
+  const missingCsrf = await app.request("/api/office/media", {method:"POST",headers:{Cookie:cookie},body:form});
+  assert.equal(missingCsrf.status,403);
+  assert.equal((await request("/api/office/media","POST",form,false)).status,401);
+  const tooLarge=new FormData(); tooLarge.set("file",new File([new Uint8Array(5*1024*1024+1)],"large.png",{type:"image/png"}));
+  assert.equal((await request("/api/office/media","POST",tooLarge)).status,400);
   const bad = new FormData();
   bad.set("file", new File(["<svg/>"], "bad.png", { type: "image/png" }));
   assert.equal((await request("/api/office/media", "POST", bad)).status, 400);
@@ -345,7 +354,8 @@ try {
   assert.equal((await request(`/berita/${a.slug}`)).status, 404);
   await request(`/api/office/inquiries/${row.id}`, "DELETE");
   await db("documents").where({ id }).delete();
-  await request("/api/office/media/" + media.id, "DELETE");
+  assert.equal((await request("/api/office/media/" + media.id, "DELETE")).status,200);
+  assert.equal((await request(media.url,"GET",undefined,false)).status,404);
   await request("/api/office/logout", "POST");
   assert.equal((await request("/api/office/session")).status, 401);
   console.log(

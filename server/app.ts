@@ -5,8 +5,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { randomUUID } from "node:crypto";
-import { readFile, mkdir, writeFile, unlink } from "node:fs/promises";
-import { resolve } from "node:path";
+import { imageStorage } from "./storage";
 import sharp from "sharp";
 import { z } from "zod";
 import { db, now } from "./db";
@@ -36,7 +35,6 @@ type User = {
   active: boolean;
 };
 export const app = new Hono<{ Variables: { user: User; csrf: string } }>();
-const uploadDir = resolve(process.env.UPLOAD_DIR || "data/uploads");
 const origin = process.env.APP_ORIGIN || "http://127.0.0.1:3000";
 const sessionCookie = "mangotek_session";
 
@@ -372,7 +370,7 @@ app.post("/api/office/documents/:id/:action", async (c) => {
   });
 });
 app.get("/api/office/media", async (c) =>
-  c.json(await db("media").orderBy("created_at", "desc")),
+  c.json(await db("media").select("id", "url", "name", "size", "width", "height", "created_at").orderBy("created_at", "desc")),
 );
 app.post("/api/office/media", async (c) => {
   const body = await c.req.parseBody();
@@ -381,11 +379,12 @@ app.post("/api/office/media", async (c) => {
     throw fail("Unggah gambar maksimal 5 MB.");
   const input = Buffer.from(await file.arrayBuffer());
   let result: Buffer;
+  let width: number, height: number;
   try {
     const image = sharp(input, { limitInputPixels: 24e6 });
     const meta = await image.metadata();
     if (!["jpeg", "png", "webp"].includes(meta.format || "")) throw Error();
-    result = await image
+    const output = await image
       .rotate()
       .resize({
         width: 2000,
@@ -394,27 +393,28 @@ app.post("/api/office/media", async (c) => {
         withoutEnlargement: true,
       })
       .webp({ quality: 85 })
-      .toBuffer();
+      .toBuffer({ resolveWithObject: true });
+    result = output.data; width = output.info.width; height = output.info.height;
   } catch {
     throw fail("Format gambar harus JPEG, PNG, atau WebP yang valid.");
   }
   const id = randomUUID(),
     url = `/uploads/${id}.webp`;
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(resolve(uploadDir, `${id}.webp`), result);
+  const location = await imageStorage.put(`${id}.webp`, result);
   try {
     await db("media").insert({
       id,
       url,
       name: file.name.slice(0, 180),
       size: result.length,
+      width, height, ...location,
       created_at: now(),
     });
   } catch (e) {
-    await unlink(resolve(uploadDir, `${id}.webp`));
+    await imageStorage.remove(`${id}.webp`, location).catch(() => { console.error("[media] Failed to clean up unregistered object", id); });
     throw e;
   }
-  return c.json({ id, url }, 201);
+  return c.json({ id, url, name: file.name.slice(0, 180), size: result.length, width, height }, 201);
 });
 app.delete("/api/office/media/:id", async (c) => {
   admin(c);
@@ -435,9 +435,9 @@ app.delete("/api/office/media/:id", async (c) => {
         "Media masih digunakan oleh konten atau versi publikasi.",
         409,
       );
+    await imageStorage.remove(`${id}.webp`, row);
     await trx("media").where({ id }).delete();
   });
-  await unlink(resolve(uploadDir, `${id}.webp`)).catch(() => {});
   return c.json({ ok: true });
 });
 
@@ -637,18 +637,23 @@ app.put("/api/office/users/:id", async (c) => {
 });
 app.get("/health", async (c) => {
   await db("documents").where({ id: "portal" }).first();
+  await db("media").select("storage_driver").first();
   return c.json({ ok: true });
 });
 app.get("/uploads/:file", async (c) => {
   const file = c.req.param("file");
   if (!/^[a-f0-9-]{36}\.webp$/.test(file)) return c.notFound();
+  const row = await db("media").where({ url: `/uploads/${file}` }).first();
+  if (!row) return c.notFound();
   try {
-    const data = await readFile(resolve(uploadDir, file));
+    const object = await imageStorage.get(file, row);
     c.header("Content-Type", "image/webp");
     c.header("Cache-Control", "public, max-age=31536000, immutable");
-    return c.body(data);
-  } catch {
-    return c.notFound();
+    if (object.size !== undefined) c.header("Content-Length", String(object.size));
+    return c.body(object.body);
+  } catch (error: any) {
+    if (error.code === "ENOENT" || error.status === 404) return c.notFound();
+    throw error;
   }
 });
 registerPublicPages(app);

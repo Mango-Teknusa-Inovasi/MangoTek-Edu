@@ -108,3 +108,7 @@ For either server engine, restore uploads from the same backup window and verify
 - Records use UTC timestamps; report dates are interpreted in Asia/Jakarta.
 - `/health` checks database availability and initial portal content. It is not a comprehensive external monitoring service.
 - Plan storage for uploads, publication snapshots, audit entries, and backups. This release does not automatically expire consultation records or publication history.
+
+## Image storage
+
+Local uploads remain the default. Optional private S3/Cloudflare R2 storage is configured through server ENV. See [media storage](MEDIA-STORAGE.md) for image upload behavior, configuration, mixed-storage compatibility, backup, and the required `002_media_storage` upgrade migration.

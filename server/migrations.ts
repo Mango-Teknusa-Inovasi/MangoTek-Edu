@@ -2,10 +2,42 @@ import type { Knex } from "knex";
 import { defaultPortal } from "../src/cms/schema";
 export const migrationSource = {
   async getMigrations() {
-    return ["001_cms"];
+    return ["001_cms", "002_media_storage"];
   },
   getMigrationName: (name: string) => name,
-  async getMigration() {
+  async getMigration(name: string) {
+    if (name === "002_media_storage")
+      return {
+        async up(db: Knex) {
+          const columns: Record<string, (t: Knex.AlterTableBuilder) => void> = {
+            storage_driver: (t) => {
+              t.string("storage_driver", 16).notNullable().defaultTo("local");
+            },
+            storage_key: (t) => {
+              t.string("storage_key", 512);
+            },
+            storage_bucket: (t) => {
+              t.string("storage_bucket", 255);
+            },
+            width: (t) => {
+              t.integer("width");
+            },
+            height: (t) => {
+              t.integer("height");
+            },
+          };
+          for (const [column, add] of Object.entries(columns)) {
+            if (!(await db.schema.hasColumn("media", column)))
+              await db.schema.alterTable("media", add);
+          }
+        },
+        async down() {
+          throw Error(
+            "Restore the matching database backup instead of reversing released migrations.",
+          );
+        },
+      };
+
     return {
       async up(db: Knex) {
         await db.schema.createTable("users", (t) => {

@@ -1,6 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, send } from "./client";
 import {
+  MediaField,
+  MediaProvider,
+  useMediaPending,
+  type MediaAsset,
+} from "./media";
+import {
   defaultPortal,
   mediaKinds,
   type DocumentRecord,
@@ -101,7 +107,8 @@ const statusLabels: Record<string, string> = {
 };
 const sectionHelp: Record<string, string> = {
   Ringkasan: "Mulai dari pekerjaan yang perlu Anda tangani hari ini.",
-  "Konten Portal": "Sunting satu bagian, simpan draf, lalu terbitkan saat siap.",
+  "Konten Portal":
+    "Sunting satu bagian, simpan draf, lalu terbitkan saat siap.",
   Berita: "Kelola kabar sekolah, kegiatan, dan artikel yang tampil di portal.",
   Produk: "Tampilkan produk dan karya melalui cerita, gambar, dan video.",
   Media: "Simpan gambar yang dapat digunakan kembali di seluruh portal.",
@@ -134,14 +141,33 @@ const iconPaths: Record<string, string> = {
   Media: "M3 4h18v16H3zM3 16l6-6 5 5 3-3 4 4M16 8h.01",
   Konsultasi: "M4 4h16v12H9l-5 4V4Zm4 4h8M8 12h5",
   Laporan: "M4 3v18h17M9 16v-5M14 16V6M19 16V9",
-  Pengguna: "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-3.87",
+  Pengguna:
+    "M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-3.87",
   Pengaturan: "M4 7h16M4 17h16M9 4v6M15 14v6",
 };
 function OfficeIcon({ name }: { name: string }) {
-  return <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={iconPaths[name] || iconPaths.Berita} /></svg>;
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={iconPaths[name] || iconPaths.Berita} />
+    </svg>
+  );
 }
 function StatusBadge({ status }: { status: string }) {
-  return <span className={`status-badge status-${status}`}>{statusLabels[status] || status}</span>;
+  return (
+    <span className={`status-badge status-${status}`}>
+      {statusLabels[status] || status}
+    </span>
+  );
 }
 function Field({
   value,
@@ -157,7 +183,10 @@ function Field({
   disabled?: boolean;
 }) {
   const key = path.split(".").pop()!,
-    caption = labels[key] || key;
+    caption =
+      key === "logo" && path.startsWith("showcase.partners.")
+        ? "Logo organisasi"
+        : labels[key] || key;
   if (key === "id") return <p className="field-help">Bagian: {value}</p>;
   if (Array.isArray(value)) {
     const fixed = ["sections", "services", "chapters"].includes(key),
@@ -189,59 +218,75 @@ function Field({
         <legend>{caption}</legend>
         {value.map((v, i) => {
           const Item = v && typeof v === "object" ? "details" : "div";
-          const itemTitle = v && typeof v === "object" ? v.label || v.title || v.q || v.name || `${caption} ${i + 1}` : "";
-          return <Item className="editor-item" key={i} {...(Item === "details" ? {open: i === 0} : {})}>
-            {Item === "details" && <summary className="editor-item-summary">{itemTitle}</summary>}
-            <div className="item-toolbar">
-              <span>{i + 1}</span>
-              {reorder && (
-                <>
+          const itemTitle =
+            v && typeof v === "object"
+              ? v.label || v.title || v.q || v.name || `${caption} ${i + 1}`
+              : "";
+          return (
+            <Item
+              className="editor-item"
+              key={i}
+              {...(Item === "details" ? { open: i === 0 } : {})}
+            >
+              {Item === "details" && (
+                <summary className="editor-item-summary">{itemTitle}</summary>
+              )}
+              <div className="item-toolbar">
+                <span>{i + 1}</span>
+                {reorder && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={i === 0}
+                      aria-label={`Naikkan ${caption} ${i + 1}`}
+                      onClick={() => {
+                        const next = [...value];
+                        [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                        onChange(next);
+                      }}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={i === value.length - 1}
+                      aria-label={`Turunkan ${caption} ${i + 1}`}
+                      onClick={() => {
+                        const next = [...value];
+                        [next[i + 1], next[i]] = [next[i], next[i + 1]];
+                        onChange(next);
+                      }}
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
+                {!fixed && (
                   <button
                     type="button"
-                    disabled={i === 0}
-                    aria-label={`Naikkan ${caption} ${i + 1}`}
-                    onClick={() => {
-                      const next = [...value];
-                      [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                      onChange(next);
-                    }}
+                    onClick={() =>
+                      onChange(value.filter((_: any, j: number) => j !== i))
+                    }
                   >
-                    ↑
+                    Hapus
                   </button>
-                  <button
-                    type="button"
-                    disabled={i === value.length - 1}
-                    aria-label={`Turunkan ${caption} ${i + 1}`}
-                    onClick={() => {
-                      const next = [...value];
-                      [next[i + 1], next[i]] = [next[i], next[i + 1]];
-                      onChange(next);
-                    }}
-                  >
-                    ↓
-                  </button>
-                </>
-              )}
-              {!fixed && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange(value.filter((_: any, j: number) => j !== i))
-                  }
-                >
-                  Hapus
-                </button>
-              )}
-            </div>
-            <Field
-              value={v}
-              onChange={(n) =>
-                onChange(value.map((x: any, j: number) => (j === i ? n : x)))
-              }
-              path={`${path}.${i}`}
-              assets={assets}
-            />
-          </Item>;
+                )}
+              </div>
+              <Field
+                value={v}
+                onChange={(n) =>
+                  onChange((current: any[]) =>
+                    current.map((x: any, j: number) =>
+                      j === i ? (typeof n === "function" ? n(x) : n) : x,
+                    ),
+                  )
+                }
+                path={`${path}.${i}`}
+                assets={assets}
+                disabled={disabled}
+              />
+            </Item>
+          );
         })}
         {!fixed && (
           <button type="button" onClick={add}>
@@ -258,7 +303,12 @@ function Field({
           <Field
             key={k}
             value={v}
-            onChange={(n) => onChange({ ...value, [k]: n })}
+            onChange={(n) =>
+              onChange((current: any) => ({
+                ...current,
+                [k]: typeof n === "function" ? n(current[k]) : n,
+              }))
+            }
             path={`${path}.${k}`}
             assets={assets}
             disabled={disabled}
@@ -310,41 +360,12 @@ function Field({
     );
   if (["logo", "parentLogo", "cover", "image", "socialImage"].includes(key))
     return (
-      <label>
-        {caption}
-        <select
-          aria-label={caption}
-          disabled={disabled}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">Pilih gambar</option>
-          {[
-            ...new Set([
-              value,
-              ...(key === "logo"
-                ? ["/brand/mangotek-edu.svg", "/brand/mangotek-edu-light.svg"]
-                : key === "parentLogo"
-                  ? ["/mango-wordmark.png"]
-                  : []),
-              ...assets.map((a) => a.url),
-            ]),
-          ]
-            .filter(Boolean)
-            .map((url) => (
-              <option key={url} value={url}>
-                {assets.find((a) => a.url === url)?.name || url}
-              </option>
-            ))}
-        </select>
-        {value && (
-          <img
-            className="asset-preview"
-            src={value}
-            alt="Pratinjau gambar terpilih"
-          />
-        )}
-      </label>
+      <MediaField
+        caption={caption}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      />
     );
   if (path.startsWith("theme."))
     return (
@@ -417,7 +438,10 @@ function ContentEditor({
     [message, setMessage] = useState(""),
     [failed, setFailed] = useState(false),
     [activeField, setActiveField] = useState(settings ? "identity" : "hero");
-  useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
+  const uploading = useMediaPending();
+  useEffect(() => {
+    onDirtyChange(dirty || uploading);
+  }, [dirty, uploading, onDirtyChange]);
   const article = record.kind !== "portal",
     isNew = record.id === "new";
   useEffect(() => {
@@ -430,12 +454,16 @@ function ContentEditor({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
   const save = async () => {
+    if (uploading) return;
     setMessage("");
     setFailed(false);
     setBusy(true);
     try {
       if (isNew) {
-        await api("/api/office/documents", send("POST", { ...draft, kind: record.kind }));
+        await api(
+          "/api/office/documents",
+          send("POST", { ...draft, kind: record.kind }),
+        );
         setDirty(false);
         onDirtyChange(false);
         refresh();
@@ -483,16 +511,43 @@ function ContentEditor({
       setBusy(false);
     }
   };
-  const fieldOrder = ["identity", "theme", "navigation", "seo", "hero", "about", "headings", "services", "steps", "faqs", "showcase", "sections", "media", "notes"];
-  const fields = Object.keys(draft).sort((a, b) => fieldOrder.indexOf(a) - fieldOrder.indexOf(b)).filter((k) =>
-    article || settings
-      ? article || ["identity", "theme", "navigation", "seo"].includes(k)
-      : !["identity", "theme", "navigation", "seo"].includes(k),
-  );
+  const fieldOrder = [
+    "identity",
+    "theme",
+    "navigation",
+    "seo",
+    "hero",
+    "about",
+    "headings",
+    "services",
+    "steps",
+    "faqs",
+    "showcase",
+    "sections",
+    "media",
+    "notes",
+  ];
+  const fields = Object.keys(draft)
+    .sort((a, b) => fieldOrder.indexOf(a) - fieldOrder.indexOf(b))
+    .filter((k) =>
+      article || settings
+        ? article || ["identity", "theme", "navigation", "seo"].includes(k)
+        : !["identity", "theme", "navigation", "seo"].includes(k),
+    );
   return (
     <div className="content-editor" aria-busy={busy}>
       <div className="editor-status">
-        <div className="editor-state"><StatusBadge status={status} /><span>Versi {revision}</span><span className={dirty ? "save-state is-dirty" : "save-state"}>{dirty ? "Modifikasi belum disimpan" : isNew ? "Belum disimpan" : "Draf tersimpan"}</span></div>
+        <div className="editor-state">
+          <StatusBadge status={status} />
+          <span>Versi {revision}</span>
+          <span className={dirty ? "save-state is-dirty" : "save-state"}>
+            {dirty
+              ? "Modifikasi belum disimpan"
+              : isNew
+                ? "Belum disimpan"
+                : "Draf tersimpan"}
+          </span>
+        </div>
         {!isNew && (
           <a
             href={`/office/preview/${record.id}`}
@@ -506,41 +561,126 @@ function ContentEditor({
       <p className="field-help">
         Simpan perubahan sebagai draf sebelum meninjau atau menerbitkan.
       </p>
-      <form className={article ? "document-editor-form" : "portal-editor-form"}
+      <form
+        className={article ? "document-editor-form" : "portal-editor-form"}
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        {!article && <nav className="editor-section-nav" aria-label="Bagian editor">
-          <span className="editor-nav-label">BAGIAN HALAMAN</span>
-          {fields.map(k => <button key={k} type="button" aria-current={activeField === k ? "true" : undefined} onClick={() => setActiveField(k)}>{labels[k] || k}<span aria-hidden="true">›</span></button>)}
-        </nav>}
+        {!article && (
+          <nav className="editor-section-nav" aria-label="Bagian editor">
+            <span className="editor-nav-label">BAGIAN HALAMAN</span>
+            {fields.map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-current={activeField === k ? "true" : undefined}
+                onClick={() => setActiveField(k)}
+              >
+                {labels[k] || k}
+                <span aria-hidden="true">›</span>
+              </button>
+            ))}
+          </nav>
+        )}
         <fieldset disabled={busy} className="editor-fields">
-          {article ? [
-            { title: "Informasi utama", keys: ["title", "slug", "summary", "category"] },
-            { title: "Gambar dan media", keys: ["cover", "coverAlt", "screenshots", "videoUrl", "videoTranscript", "websiteUrl"] },
-            { title: "Isi halaman", keys: ["blocks"] },
-            { title: "Tampilan di pencarian", keys: ["seoTitle", "seoDescription"] },
-          ].map(group => <section className="editor-section" key={group.title}>
-            <div className="editor-section-heading"><h2>{group.title}</h2></div>
-            <div className="editor-group">{group.keys.filter(k => fields.includes(k)).map(k => <Field key={k} path={k} value={draft[k]} onChange={value => { setDraft({ ...draft, [k]: value }); setDirty(true); }} assets={assets} />)}</div>
-          </section>) : fields.filter(k => k === activeField).map((k) => (
-            <section className="editor-section" key={k} aria-labelledby={`editor-${k}`}>
-              <div className="editor-section-heading"><h2 id={`editor-${k}`}>{labels[k] || k}</h2>{fieldHelp[k] && <p>{fieldHelp[k]}</p>}</div>
-              <Field path={k} value={draft[k]} onChange={(value) => { setDraft({ ...draft, [k]: value }); setDirty(true); }} assets={assets} />
-            </section>
-          ))}
+          {article
+            ? [
+                {
+                  title: "Informasi utama",
+                  keys: ["title", "slug", "summary", "category"],
+                },
+                {
+                  title: "Gambar dan media",
+                  keys: [
+                    "cover",
+                    "coverAlt",
+                    "screenshots",
+                    "videoUrl",
+                    "videoTranscript",
+                    "websiteUrl",
+                  ],
+                },
+                { title: "Isi halaman", keys: ["blocks"] },
+                {
+                  title: "Tampilan di pencarian",
+                  keys: ["seoTitle", "seoDescription"],
+                },
+              ].map((group) => (
+                <section className="editor-section" key={group.title}>
+                  <div className="editor-section-heading">
+                    <h2>{group.title}</h2>
+                  </div>
+                  <div className="editor-group">
+                    {group.keys
+                      .filter((k) => fields.includes(k))
+                      .map((k) => (
+                        <Field
+                          key={k}
+                          path={k}
+                          value={draft[k]}
+                          onChange={(value) => {
+                            setDraft((current: any) => ({
+                              ...current,
+                              [k]:
+                                typeof value === "function"
+                                  ? value(current[k])
+                                  : value,
+                            }));
+                            setDirty(true);
+                          }}
+                          assets={assets}
+                          disabled={busy}
+                        />
+                      ))}
+                  </div>
+                </section>
+              ))
+            : fields
+                .filter((k) => k === activeField)
+                .map((k) => (
+                  <section
+                    className="editor-section"
+                    key={k}
+                    aria-labelledby={`editor-${k}`}
+                  >
+                    <div className="editor-section-heading">
+                      <h2 id={`editor-${k}`}>{labels[k] || k}</h2>
+                      {fieldHelp[k] && <p>{fieldHelp[k]}</p>}
+                    </div>
+                    <Field
+                      path={k}
+                      value={draft[k]}
+                      onChange={(value) => {
+                        setDraft((current: any) => ({
+                          ...current,
+                          [k]:
+                            typeof value === "function"
+                              ? value(current[k])
+                              : value,
+                        }));
+                        setDirty(true);
+                      }}
+                      assets={assets}
+                      disabled={busy}
+                    />
+                  </section>
+                ))}
         </fieldset>
         <div className="editor-actions editor-savebar">
-          <button className="button button-green" disabled={busy}>
-            {busy ? "Memproses…" : "Simpan draf"}
+          <button className="button button-green" disabled={busy || uploading}>
+            {uploading
+              ? "Menunggu unggahan…"
+              : busy
+                ? "Memproses…"
+                : "Simpan draf"}
           </button>
           {!isNew && (
             <>
               <button
                 type="button"
-                disabled={busy || dirty}
+                disabled={busy || uploading || dirty}
                 onClick={() => action("review")}
               >
                 Ajukan tinjauan
@@ -548,7 +688,7 @@ function ContentEditor({
               {admin && (
                 <button
                   type="button"
-                  disabled={busy || dirty}
+                  disabled={busy || uploading || dirty}
                   onClick={() => action("publish")}
                 >
                   Terbitkan
@@ -557,7 +697,7 @@ function ContentEditor({
               {admin && article && record.published && (
                 <button
                   type="button"
-                  disabled={busy || dirty}
+                  disabled={busy || uploading || dirty}
                   onClick={() => action("unpublish")}
                 >
                   Tarik publikasi
@@ -565,11 +705,18 @@ function ContentEditor({
               )}
             </>
           )}
-          <span className="savebar-hint">{dirty ? "Simpan draf untuk mengaktifkan publikasi." : "Perubahan tampil di portal setelah diterbitkan."}</span>
+          <span className="savebar-hint">
+            {dirty
+              ? "Simpan draf untuk mengaktifkan publikasi."
+              : "Perubahan tampil di portal setelah diterbitkan."}
+          </span>
         </div>
       </form>
       {message && (
-        <p className={`office-notice editor-feedback ${failed ? "is-error" : "is-success"}`} role={failed ? "alert" : "status"}>
+        <p
+          className={`office-notice editor-feedback ${failed ? "is-error" : "is-success"}`}
+          role={failed ? "alert" : "status"}
+        >
           {message}
         </p>
       )}
@@ -588,9 +735,19 @@ const blankArticle: Article = {
   seoDescription: "",
 };
 const blankProduct: Product = {
-  title: "Produk baru", slug: "produk-baru", summary: "", category: "Produk pendidikan",
-  cover: "", coverAlt: "", blocks: [{ type: "paragraph", text: "" }], screenshots: [],
-  videoUrl: "", videoTranscript: "", websiteUrl: "", seoTitle: "", seoDescription: "",
+  title: "Produk baru",
+  slug: "produk-baru",
+  summary: "",
+  category: "Produk pendidikan",
+  cover: "",
+  coverAlt: "",
+  blocks: [{ type: "paragraph", text: "" }],
+  screenshots: [],
+  videoUrl: "",
+  videoTranscript: "",
+  websiteUrl: "",
+  seoTitle: "",
+  seoDescription: "",
 };
 function Inquiries({
   report,
@@ -612,7 +769,9 @@ function Inquiries({
   const load = (signal?: AbortSignal) =>
     api(`/api/office/inquiries?${query}`, { signal })
       .then(setRows)
-      .catch((e) => { if (!signal?.aborted) onError(e.message); });
+      .catch((e) => {
+        if (!signal?.aborted) onError(e.message);
+      });
   useEffect(() => {
     const controller = new AbortController();
     load(controller.signal);
@@ -944,25 +1103,144 @@ function Users({ onError }: { onError: (s: string) => void }) {
     </>
   );
 }
-function matchesDocument(d: DocumentRecord, kind: string, search: string, status: string) {
+function matchesDocument(
+  d: DocumentRecord,
+  kind: string,
+  search: string,
+  status: string,
+) {
   const content = d.draft as Article;
-  return d.kind === kind && (!status || d.status === status) &&
-    `${content.title} ${content.category}`.toLocaleLowerCase("id").includes(search.toLocaleLowerCase("id").trim());
+  return (
+    d.kind === kind &&
+    (!status || d.status === status) &&
+    `${content.title} ${content.category}`
+      .toLocaleLowerCase("id")
+      .includes(search.toLocaleLowerCase("id").trim())
+  );
 }
-function Overview({ docs, admin, name, navigate }: { docs: DocumentRecord[]; admin: boolean; name: string; navigate: (section: string) => void }) {
-  const content = docs.filter(d => d.kind !== "portal");
-  const review = docs.filter(d => d.status === "review");
-  const shortcuts = admin ? ["Konten Portal", "Berita", "Produk", "Konsultasi"] : ["Konten Portal", "Berita", "Produk", "Media"];
-  return <div className="office-overview">
-    <section className="workspace-welcome"><div><span className="office-kicker">MANGOTEK EDU · OFFICE</span><h2>Selamat bekerja, {name}.</h2><p>Rawat informasi portal dan bantu sekolah menemukan dukungan yang tepat.</p></div><a href="/" target="_blank" rel="noreferrer">Buka portal <span aria-hidden="true">↗</span></a></section>
-    <section className="workspace-metrics" aria-label="Ringkasan konten">
-      {[{label:"Berita",value:content.filter(d=>d.kind==="article").length,section:"Berita"},{label:"Produk & portofolio",value:content.filter(d=>d.kind==="product").length,section:"Produk"},{label:"Menunggu tinjauan",value:review.length,section:review[0]?.kind==="product"?"Produk":review[0]?.kind==="article"?"Berita":"Konten Portal"}].map(item=><button key={item.label} onClick={()=>navigate(item.section)}><span>{item.label}</span><strong>{item.value}</strong><span className="metric-link">Lihat konten <span aria-hidden="true">↗</span></span></button>)}
-    </section>
-    <section className="workspace-shortcuts"><h2>Apa yang ingin Anda kerjakan?</h2><div>{shortcuts.map(section=><button key={section} onClick={()=>navigate(section)}><OfficeIcon name={section}/><span><strong>{section}</strong><small>{sectionHelp[section]}</small></span><span aria-hidden="true">→</span></button>)}</div></section>
-    <section className="workspace-recent"><div className="office-heading"><div><h2>Konten terakhir diperbarui</h2><p>Draf tetap tersimpan untuk dilanjutkan kapan saja.</p></div></div>
-      <div className="office-list">{docs.slice(0,5).map(d=><button className="list-row" key={d.id} onClick={()=>navigate(d.kind==="portal"?"Konten Portal":d.kind==="product"?"Produk":"Berita")}><span><strong>{d.kind==="portal"?"Beranda MangoTek Edu":(d.draft as Article).title}</strong><small>{d.kind==="portal"?"Konten Portal":d.kind==="product"?"Produk":"Berita"}{d.updatedAt && ` · ${new Date(d.updatedAt).toLocaleDateString("id-ID", {day:"numeric",month:"short",year:"numeric", timeZone:"Asia/Jakarta"})}`}</small></span><StatusBadge status={d.status}/></button>)}</div>
-    </section>
-  </div>;
+function Overview({
+  docs,
+  admin,
+  name,
+  navigate,
+}: {
+  docs: DocumentRecord[];
+  admin: boolean;
+  name: string;
+  navigate: (section: string) => void;
+}) {
+  const content = docs.filter((d) => d.kind !== "portal");
+  const review = docs.filter((d) => d.status === "review");
+  const shortcuts = admin
+    ? ["Konten Portal", "Berita", "Produk", "Konsultasi"]
+    : ["Konten Portal", "Berita", "Produk", "Media"];
+  return (
+    <div className="office-overview">
+      <section className="workspace-welcome">
+        <div>
+          <span className="office-kicker">MANGOTEK EDU · OFFICE</span>
+          <h2>Selamat bekerja, {name}.</h2>
+          <p>
+            Rawat informasi portal dan bantu sekolah menemukan dukungan yang
+            tepat.
+          </p>
+        </div>
+        <a href="/" target="_blank" rel="noreferrer">
+          Buka portal <span aria-hidden="true">↗</span>
+        </a>
+      </section>
+      <section className="workspace-metrics" aria-label="Ringkasan konten">
+        {[
+          {
+            label: "Berita",
+            value: content.filter((d) => d.kind === "article").length,
+            section: "Berita",
+          },
+          {
+            label: "Produk & portofolio",
+            value: content.filter((d) => d.kind === "product").length,
+            section: "Produk",
+          },
+          {
+            label: "Menunggu tinjauan",
+            value: review.length,
+            section:
+              review[0]?.kind === "product"
+                ? "Produk"
+                : review[0]?.kind === "article"
+                  ? "Berita"
+                  : "Konten Portal",
+          },
+        ].map((item) => (
+          <button key={item.label} onClick={() => navigate(item.section)}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <span className="metric-link">
+              Lihat konten <span aria-hidden="true">↗</span>
+            </span>
+          </button>
+        ))}
+      </section>
+      <section className="workspace-shortcuts">
+        <h2>Apa yang ingin Anda kerjakan?</h2>
+        <div>
+          {shortcuts.map((section) => (
+            <button key={section} onClick={() => navigate(section)}>
+              <OfficeIcon name={section} />
+              <span>
+                <strong>{section}</strong>
+                <small>{sectionHelp[section]}</small>
+              </span>
+              <span aria-hidden="true">→</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="workspace-recent">
+        <div className="office-heading">
+          <div>
+            <h2>Konten terakhir diperbarui</h2>
+            <p>Draf tetap tersimpan untuk dilanjutkan kapan saja.</p>
+          </div>
+        </div>
+        <div className="office-list">
+          {docs.slice(0, 5).map((d) => (
+            <button
+              className="list-row"
+              key={d.id}
+              onClick={() =>
+                navigate(
+                  d.kind === "portal"
+                    ? "Konten Portal"
+                    : d.kind === "product"
+                      ? "Produk"
+                      : "Berita",
+                )
+              }
+            >
+              <span>
+                <strong>
+                  {d.kind === "portal"
+                    ? "Beranda MangoTek Edu"
+                    : (d.draft as Article).title}
+                </strong>
+                <small>
+                  {d.kind === "portal"
+                    ? "Konten Portal"
+                    : d.kind === "product"
+                      ? "Produk"
+                      : "Berita"}
+                  {d.updatedAt &&
+                    ` · ${new Date(d.updatedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" })}`}
+                </small>
+              </span>
+              <StatusBadge status={d.status} />
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 export default function Office() {
   const [session, setSession] = useState<{ user: User } | null>(null),
@@ -970,7 +1248,7 @@ export default function Office() {
     [section, setSection] = useState("Ringkasan"),
     [message, setMessage] = useState(""),
     [docs, setDocs] = useState<DocumentRecord[]>([]),
-    [assets, setAssets] = useState<any[]>([]),
+    [assets, setAssets] = useState<MediaAsset[]>([]),
     [selected, setSelected] = useState<string | null>(null),
     [newArticle, setNewArticle] = useState(false),
     [busy, setBusy] = useState(false),
@@ -980,9 +1258,18 @@ export default function Office() {
     [statusFilter, setStatusFilter] = useState("");
   const navigate = (next: string) => {
     if (next === section && !selected && !newArticle) return;
-    if (dirty && !window.confirm("Perubahan belum disimpan. Tinggalkan halaman ini?")) return;
-    setDirty(false); setSection(next); setSelected(null); setNewArticle(false);
-    setSearch(""); setStatusFilter(""); setMessage("");
+    if (
+      dirty &&
+      !window.confirm("Perubahan belum disimpan. Tinggalkan halaman ini?")
+    )
+      return;
+    setDirty(false);
+    setSection(next);
+    setSelected(null);
+    setNewArticle(false);
+    setSearch("");
+    setStatusFilter("");
+    setMessage("");
     window.scrollTo({ top: 0, behavior: "instant" });
   };
   const load = () =>
@@ -1070,7 +1357,7 @@ export default function Office() {
     : ["Ringkasan", "Konten Portal", "Berita", "Produk", "Media"];
   const documentKind = section === "Produk" ? "product" : "article";
   const record =
-    (section === "Berita" || section === "Produk")
+    section === "Berita" || section === "Produk"
       ? newArticle
         ? ({
             id: "new",
@@ -1085,220 +1372,301 @@ export default function Office() {
         : docs.find((d) => d.id === selected)
       : docs.find((d) => d.id === "portal");
   return (
-    <div className="office-shell">
-      <a className="skip-link" href="#office-main">
-        Langsung ke konten office
-      </a>
-      <aside className="office-sidebar">
-        <a href="/">
-          <img src="/brand/mangotek-edu.svg" alt="MangoTek Edu" />
+    <MediaProvider
+      assets={assets}
+      add={(asset) =>
+        setAssets((current) => [
+          asset,
+          ...current.filter((a) => a.id !== asset.id),
+        ])
+      }
+    >
+      <div className="office-shell">
+        <a className="skip-link" href="#office-main">
+          Langsung ke konten office
         </a>
-        <span className="office-label">RUANG KERJA</span>
-        <nav aria-label="Menu office">
-          {menu.map((s) => (
-            <button
-              key={s}
-              aria-current={section === s ? "page" : undefined}
-              onClick={() => navigate(s)}
-            >
-              <OfficeIcon name={s} /><span>{s}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="office-account">
-          <strong>{session.user.name}</strong>
-          <span>{admin ? "Admin" : "Editor"}</span>
-          <button
-            onClick={async () => {
-              if (dirty && !window.confirm("Perubahan belum disimpan. Tetap keluar?")) return;
-              try {
-                setDirty(false);
-                await api("/api/office/logout", send("POST"));
-                setSession(null);
-                setMessage("");
-              } catch (e) {
-                setMessage((e as Error).message);
-              }
-            }}
-          >
-            Keluar
-          </button>
-        </div>
-      </aside>
-      <main id="office-main" className="office-main" aria-busy={dataLoading}>
-        <header className="office-heading">
-          <div>
-            <p>MangoTek Edu</p>
-            <h1>{section}</h1>
-            <p className="office-section-description">{sectionHelp[section]}</p>
-          </div>
-          <a href="/" target="_blank" rel="noreferrer">
-            Lihat portal ↗
+        <aside className="office-sidebar">
+          <a href="/">
+            <img src="/brand/mangotek-edu.svg" alt="MangoTek Edu" />
           </a>
-        </header>
-        {message && (
-          <p className="office-notice" role="status">
-            {message}
-          </p>
-        )}
-        {dataLoading && <div className="office-loading" role="status">Memuat ruang kerja…</div>}
-        {section === "Ringkasan" && !dataLoading && <Overview docs={docs} admin={admin} name={session.user.name} navigate={navigate} />}
-        {(section === "Konten Portal" || section === "Pengaturan") &&
-          record && (
-            <ContentEditor
-              key={`${section}-${record.id}`}
-              record={record}
-              assets={assets}
-              admin={admin}
-              settings={section === "Pengaturan"}
-              refresh={load}
-              onDirtyChange={setDirty}
-              onSaved={saved => setDocs(current => current.map(d => d.id === saved.id ? saved : d))}
-            />
-          )}
-        {(section === "Berita" || section === "Produk") &&
-          (record ? (
-            <>
+          <span className="office-label">RUANG KERJA</span>
+          <nav aria-label="Menu office">
+            {menu.map((s) => (
               <button
-                className="back-button"
-                onClick={() => {
-                  if (dirty && !window.confirm("Perubahan belum disimpan. Kembali ke daftar?")) return;
-                  setDirty(false);
-                  setSelected(null);
-                  setNewArticle(false);
-                  load();
-                }}
+                key={s}
+                aria-current={section === s ? "page" : undefined}
+                onClick={() => navigate(s)}
               >
-                ← Daftar {section.toLowerCase()}
+                <OfficeIcon name={s} />
+                <span>{s}</span>
               </button>
-              <ContentEditor
-                key={record.id}
-                record={record}
-                assets={assets}
-                admin={admin}
-                settings={false}
-                onDirtyChange={setDirty}
-              onSaved={saved => setDocs(current => current.map(d => d.id === saved.id ? saved : d))}
-                refresh={() => {
-                  setNewArticle(false);
-                  setSelected(null);
-                  load();
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <div className="office-heading">
-                <p>Draf dan {section.toLowerCase()} yang telah diterbitkan.</p>
-                <button
-                  className="button button-green"
-                  onClick={() => setNewArticle(true)}
-                >
-                  {section === "Produk" ? "Tambah produk" : "Tulis berita"}
-                </button>
-              </div>
-              <div className="content-list-filters">
-                <label>Cari {section.toLowerCase()}<input type="search" placeholder="Judul atau kategori…" value={search} onChange={e => setSearch(e.target.value)} /></label>
-                <label>Status publikasi<select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">Semua status</option>{["draft", "review", "published"].map(s => <option key={s} value={s}>{statusLabels[s]}</option>)}</select></label>
-              </div>
-              <div className="office-list">
-                {docs.filter((d) => matchesDocument(d, documentKind, search, statusFilter)).length === 0 && (
-                  <div className="office-empty"><OfficeIcon name={section} /><h2>{search || statusFilter ? "Tidak ada hasil yang cocok" : `Belum ada ${section.toLowerCase()}`}</h2><p>{search || statusFilter ? "Coba kata pencarian atau status lain." : "Buat draf pertama. Konten hanya tampil di portal setelah diterbitkan."}</p></div>
-                )}
-                {docs
-                  .filter((d) => matchesDocument(d, documentKind, search, statusFilter))
-                  .map((d) => (
-                    <button
-                      className="list-row"
-                      key={d.id}
-                      onClick={() => setSelected(d.id)}
-                    >
-                      <span>
-                        <strong>{(d.draft as Article).title}</strong>
-                        <small>{(d.draft as Article).category}</small>
-                      </span>
-                      <StatusBadge status={d.status} />
-                    </button>
-                  ))}
-              </div>
-            </>
-          ))}
-        {section === "Media" && (
-          <>
-            <p>
-              Unggah JPEG, PNG, atau WebP, maksimal 5 MB. Gambar akan
-              dioptimalkan untuk portal.
-            </p>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const f = e.currentTarget;
-                setBusy(true);
+            ))}
+          </nav>
+          <div className="office-account">
+            <strong>{session.user.name}</strong>
+            <span>{admin ? "Admin" : "Editor"}</span>
+            <button
+              onClick={async () => {
+                if (
+                  dirty &&
+                  !window.confirm("Perubahan belum disimpan. Tetap keluar?")
+                )
+                  return;
                 try {
-                  await api("/api/office/media", {
-                    method: "POST",
-                    body: new FormData(f),
-                  });
-                  f.reset();
-                  load();
-                  setMessage("Gambar berhasil diunggah.");
+                  setDirty(false);
+                  await api("/api/office/logout", send("POST"));
+                  setSession(null);
+                  setMessage("");
                 } catch (e) {
                   setMessage((e as Error).message);
-                } finally {
-                  setBusy(false);
                 }
               }}
             >
-              <label>
-                Gambar
-                <input
-                  type="file"
-                  name="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  required
-                />
-              </label>
-              <button className="button button-green" disabled={busy}>
-                {busy ? "Mengunggah…" : "Unggah gambar"}
-              </button>
-            </form>
-            <div className="media-library">
-              {assets.map((a) => (
-                <figure key={a.id}>
-                  <img src={a.url} alt={a.name} />
-                  <figcaption>{a.name}</figcaption>
-                  {admin && (
-                    <button
-                      onClick={async () => {
-                        if (!confirm("Hapus gambar ini?")) return;
-                        try {
-                          await api(
-                            `/api/office/media/${a.id}`,
-                            send("DELETE"),
-                          );
-                          load();
-                        } catch (e) {
-                          setMessage((e as Error).message);
-                        }
-                      }}
-                    >
-                      Hapus
-                    </button>
-                  )}
-                </figure>
-              ))}
+              Keluar
+            </button>
+          </div>
+        </aside>
+        <main id="office-main" className="office-main" aria-busy={dataLoading}>
+          <header className="office-heading">
+            <div>
+              <p>MangoTek Edu</p>
+              <h1>{section}</h1>
+              <p className="office-section-description">
+                {sectionHelp[section]}
+              </p>
             </div>
-          </>
-        )}
-        {(section === "Konsultasi" || section === "Laporan") && (
-          <Inquiries
-            key={section}
-            report={section === "Laporan"}
-            onError={setMessage}
-          />
-        )}
-        {section === "Pengguna" && <Users onError={setMessage} />}
-      </main>
-    </div>
+            <a href="/" target="_blank" rel="noreferrer">
+              Lihat portal ↗
+            </a>
+          </header>
+          {message && (
+            <p className="office-notice" role="status">
+              {message}
+            </p>
+          )}
+          {dataLoading && (
+            <div className="office-loading" role="status">
+              Memuat ruang kerja…
+            </div>
+          )}
+          {section === "Ringkasan" && !dataLoading && (
+            <Overview
+              docs={docs}
+              admin={admin}
+              name={session.user.name}
+              navigate={navigate}
+            />
+          )}
+          {(section === "Konten Portal" || section === "Pengaturan") &&
+            record && (
+              <ContentEditor
+                key={`${section}-${record.id}`}
+                record={record}
+                assets={assets}
+                admin={admin}
+                settings={section === "Pengaturan"}
+                refresh={load}
+                onDirtyChange={setDirty}
+                onSaved={(saved) =>
+                  setDocs((current) =>
+                    current.map((d) => (d.id === saved.id ? saved : d)),
+                  )
+                }
+              />
+            )}
+          {(section === "Berita" || section === "Produk") &&
+            (record ? (
+              <>
+                <button
+                  className="back-button"
+                  onClick={() => {
+                    if (
+                      dirty &&
+                      !window.confirm(
+                        "Perubahan belum disimpan. Kembali ke daftar?",
+                      )
+                    )
+                      return;
+                    setDirty(false);
+                    setSelected(null);
+                    setNewArticle(false);
+                    load();
+                  }}
+                >
+                  ← Daftar {section.toLowerCase()}
+                </button>
+                <ContentEditor
+                  key={record.id}
+                  record={record}
+                  assets={assets}
+                  admin={admin}
+                  settings={false}
+                  onDirtyChange={setDirty}
+                  onSaved={(saved) =>
+                    setDocs((current) =>
+                      current.map((d) => (d.id === saved.id ? saved : d)),
+                    )
+                  }
+                  refresh={() => {
+                    setNewArticle(false);
+                    setSelected(null);
+                    load();
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <div className="office-heading">
+                  <p>
+                    Draf dan {section.toLowerCase()} yang telah diterbitkan.
+                  </p>
+                  <button
+                    className="button button-green"
+                    onClick={() => setNewArticle(true)}
+                  >
+                    {section === "Produk" ? "Tambah produk" : "Tulis berita"}
+                  </button>
+                </div>
+                <div className="content-list-filters">
+                  <label>
+                    Cari {section.toLowerCase()}
+                    <input
+                      type="search"
+                      placeholder="Judul atau kategori…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Status publikasi
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">Semua status</option>
+                      {["draft", "review", "published"].map((s) => (
+                        <option key={s} value={s}>
+                          {statusLabels[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="office-list">
+                  {docs.filter((d) =>
+                    matchesDocument(d, documentKind, search, statusFilter),
+                  ).length === 0 && (
+                    <div className="office-empty">
+                      <OfficeIcon name={section} />
+                      <h2>
+                        {search || statusFilter
+                          ? "Tidak ada hasil yang cocok"
+                          : `Belum ada ${section.toLowerCase()}`}
+                      </h2>
+                      <p>
+                        {search || statusFilter
+                          ? "Coba kata pencarian atau status lain."
+                          : "Buat draf pertama. Konten hanya tampil di portal setelah diterbitkan."}
+                      </p>
+                    </div>
+                  )}
+                  {docs
+                    .filter((d) =>
+                      matchesDocument(d, documentKind, search, statusFilter),
+                    )
+                    .map((d) => (
+                      <button
+                        className="list-row"
+                        key={d.id}
+                        onClick={() => setSelected(d.id)}
+                      >
+                        <span>
+                          <strong>{(d.draft as Article).title}</strong>
+                          <small>{(d.draft as Article).category}</small>
+                        </span>
+                        <StatusBadge status={d.status} />
+                      </button>
+                    ))}
+                </div>
+              </>
+            ))}
+          {section === "Media" && (
+            <>
+              <p>
+                Unggah JPEG, PNG, atau WebP, maksimal 5 MB. Gambar akan
+                dioptimalkan untuk portal.
+              </p>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const f = e.currentTarget;
+                  setBusy(true);
+                  try {
+                    await api("/api/office/media", {
+                      method: "POST",
+                      body: new FormData(f),
+                    });
+                    f.reset();
+                    load();
+                    setMessage("Gambar berhasil diunggah.");
+                  } catch (e) {
+                    setMessage((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <label>
+                  Gambar
+                  <input
+                    type="file"
+                    name="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    required
+                  />
+                </label>
+                <button className="button button-green" disabled={busy}>
+                  {busy ? "Mengunggah…" : "Unggah gambar"}
+                </button>
+              </form>
+              <div className="media-library">
+                {assets.map((a) => (
+                  <figure key={a.id}>
+                    <img src={a.url} alt={a.name} />
+                    <figcaption>{a.name}</figcaption>
+                    {admin && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Hapus gambar ini?")) return;
+                          try {
+                            await api(
+                              `/api/office/media/${a.id}`,
+                              send("DELETE"),
+                            );
+                            load();
+                          } catch (e) {
+                            setMessage((e as Error).message);
+                          }
+                        }}
+                      >
+                        Hapus
+                      </button>
+                    )}
+                  </figure>
+                ))}
+              </div>
+            </>
+          )}
+          {(section === "Konsultasi" || section === "Laporan") && (
+            <Inquiries
+              key={section}
+              report={section === "Laporan"}
+              onError={setMessage}
+            />
+          )}
+          {section === "Pengguna" && <Users onError={setMessage} />}
+        </main>
+      </div>
+    </MediaProvider>
   );
 }

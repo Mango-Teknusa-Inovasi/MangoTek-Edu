@@ -790,3 +790,52 @@ select:focus-visible {
 .editor-item-summary { font-size: .84rem; font-weight: 600; cursor: pointer; line-height: 1.6; padding-block: 10px; overflow-wrap: anywhere; }
 .editor-item[open] > .editor-item-summary { margin-bottom: 15px; }
 .editor-item:has(> .editor-item-summary):not([open]) { padding-bottom: 8px; margin-bottom: 8px; }
+
+.media-field { min-width: 0; }
+.media-field-label { display: block; margin-bottom: 10px; font-size: .875rem; font-weight: 600; }
+.media-dropzone { padding: 20px; border: 1px dashed #aabca4; background: #f9fbf6; border-radius: 9px; transition: border-color 160ms, background-color 160ms; }
+.media-dropzone.is-dragging { background: #e8f1e1; border-color: #235536; outline: 2px solid #235536; }
+.media-placeholder { display: grid; justify-items: center; gap: 10px; padding: 14px 8px 20px; text-align: center; }
+.media-placeholder svg { color: #607b58; }
+.media-placeholder strong { font-size: .86rem; }
+.media-placeholder span { font-size: .74rem; color: #59695e; }
+.media-field-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.office-shell .media-upload-button { background: #1e4233 !important; color: #fff; border-color: #1e4233 !important; }
+.office-shell .media-upload-button:hover:not(:disabled) { background: #143324 !important; }
+.media-file-input { position: absolute; width: 1px !important; height: 1px; opacity: 0; overflow: hidden; clip-path: inset(50%); padding: 0 !important; pointer-events: none; }
+.media-current { display: flex; gap: 18px; align-items: center; padding-bottom: 20px; }
+.media-thumbnail { display: grid; place-items: center; flex: 0 0 100px; height: 82px; border-radius: 6px; background: #e9eee5; border: 1px solid #d8e2ce; padding: 10px; }
+.media-thumbnail img { max-width: 100%; max-height: 60px; object-fit: contain; }
+.media-current > div:last-child { min-width: 0; }
+.media-current strong { display: block; font-size: .83rem; line-height: 1.6; overflow-wrap: anywhere; }
+.media-current small { display: block; margin-top: 5px; font-size: .73rem; color: #59695e; line-height: 1.7; }
+.has-image .media-field-actions { justify-content: flex-start; }
+.media-upload-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-top: 1px solid #d6dfcf; padding-top: 16px; margin-top: 18px; }
+.media-upload-progress label { font-size: .78rem; width: 100%; }
+.media-upload-progress progress { flex: 1; min-width: 70px; accent-color: #2c6541; height: 9px; }
+.media-feedback { font-size: .75rem; color: #466342; line-height: 1.7; margin-block: 8px 0; }
+.media-feedback:empty { display: none; }
+.media-field > .form-error { font-size: .8rem; line-height: 1.7; }
+.media-picker { padding: 30px; width: min(820px, calc(100vw - 32px)); max-height: min(85svh, 900px); overflow: auto; border: 1px solid #cdd9c5; border-radius: 12px; color: #1c3b2e; background: #fffefa; }
+.media-picker::backdrop { background: rgb(15 35 24 / .5); }
+.media-picker-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 24px; }
+.media-picker-heading h2 { margin: 0; font-size: 1.4rem; }
+.media-picker-heading p { font-size: .8rem; line-height: 1.7; color: #59695e; }
+.media-picker-heading button { white-space: nowrap; }
+.media-picker-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 24px; }
+.office-shell .media-picker-grid > button { text-align: left; padding: 10px; background: #fff; min-width: 0; }
+.media-picker-grid button[aria-pressed="true"] { border: 2px solid #2d633d !important; background: #edf4e7 !important; }
+.media-picker-grid button > div { background: #e9eee5; height: 115px; display: grid; place-items: center; padding: 12px; border-radius: 4px; }
+.media-picker-grid img { max-height: 90px; width: 100%; object-fit: contain; }
+.media-picker-grid strong { display: block; font-size: .76rem; line-height: 1.6; overflow-wrap: anywhere; margin-top: 10px; }
+.media-picker-grid small, .media-picker-grid button > span { display: block; font-size: .68rem; margin-top: 5px; color: #49613f; }
+@media (max-width: 600px) {
+  .media-dropzone { padding: 15px; }
+  .media-current { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .media-thumbnail { flex-basis: auto; width: 120px; }
+  .media-field-actions > button { flex: 1; }
+  .media-picker { padding: 20px 16px; }
+  .media-picker-heading { flex-direction: column; gap: 5px; }
+  .media-picker-heading button { align-self: flex-end; }
+  .media-picker-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+}

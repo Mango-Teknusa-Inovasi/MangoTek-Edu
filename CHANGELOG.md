@@ -6,6 +6,28 @@ Notable changes are recorded here. Releases use Semantic Versioning; while the p
 
 No changes yet.
 
+## [0.2.2] - 2026-11-06
+
+### Added
+
+- Inline image upload and drag-and-drop controls for brand logos, organization logos, covers, screenshots, and social images.
+- A searchable thumbnail library with keyboard focus handling, upload progress, cancellation, and retry feedback.
+- Optional private S3-compatible and Cloudflare R2 storage configured through server environment variables.
+- Per-media storage locations, stable public image URLs, optimized dimensions, and mixed local/cloud image delivery.
+- S3-compatible integration tests, legacy migration checks, storage-failure cleanup checks, and responsive media workflow tests.
+
+### Fixed
+
+- Organization logo fields use context-specific labels and no longer require selecting a URL from a dropdown.
+- Completing an asynchronous upload preserves edits made to other fields during the transfer.
+- Saving and publishing wait for active image uploads to finish.
+
+### Upgrade
+
+- **Run `npm run db:migrate` using the new image.** Migration `002_media_storage` is required; health checks report an error until it is applied.
+- Existing uploads remain local. Cloud storage is optional and does not move existing files. See [media storage and Portainer instructions](docs/MEDIA-STORAGE.md).
+- Real AWS S3/R2 credentials were not supplied; cloud behavior is verified against an isolated S3-compatible emulator.
+
 ## [0.2.1] - 2026-11-05
 
 ### Changed
