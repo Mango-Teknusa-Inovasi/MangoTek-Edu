@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "./client";
+import { getBootstrap } from "./bootstrap";
+import { Skeleton, LoadError } from "../components/loading/Loading";
+import { useRead } from "./useRead";
 import { usePortal } from "./PortalContext";
 import type { Article } from "./schema";
 export type NewsItem = Article & { id: string; publishedAt: string };
@@ -26,8 +29,11 @@ export function NewsCards({ items }: { items: NewsItem[] }) {
   );
 }
 export function LatestNews() {
-  const [items, setItems] = useState<NewsItem[]>([]);
+  const boot = getBootstrap();
+  const initial = boot?.page.kind === "home" ? boot.page.news : undefined;
+  const [items, setItems] = useState<NewsItem[]>(initial || []);
   useEffect(() => {
+    if (initial) return;
     api("/api/news")
       .then((r) => setItems(r.items.slice(0, 3)))
       .catch(() => {});
@@ -46,12 +52,23 @@ export function LatestNews() {
     </section>
   ) : null;
 }
-export function ArticleView({ article }: { article: Article & { publishedAt?: string } }) {
+export function ArticleView({
+  article,
+}: {
+  article: Article & { publishedAt?: string };
+}) {
   return (
     <article className="news-article">
       <p className="news-category">{article.category}</p>
       <h1>{article.title}</h1>
-      {article.publishedAt && <time dateTime={article.publishedAt}>{new Date(article.publishedAt).toLocaleDateString("id-ID", { dateStyle: "long", timeZone: "Asia/Jakarta" })}</time>}
+      {article.publishedAt && (
+        <time dateTime={article.publishedAt}>
+          {new Date(article.publishedAt).toLocaleDateString("id-ID", {
+            dateStyle: "long",
+            timeZone: "Asia/Jakarta",
+          })}
+        </time>
+      )}
       <p className="news-lead">{article.summary}</p>
       {article.cover && <img src={article.cover} alt={article.coverAlt} />}
       <div className="article-body">
@@ -72,13 +89,20 @@ export default function News() {
   const portal = usePortal();
   const slug = location.pathname.split("/")[2];
   const params = new URLSearchParams(location.search);
-  const [result, setResult] = useState<any>(null),
-    [error, setError] = useState("");
-  useEffect(() => {
-    api(slug ? `/api/news/${encodeURIComponent(slug)}` : `/api/news?${params}`)
-      .then(setResult)
-      .catch((e) => setError(e.message));
-  }, []);
+  const boot = getBootstrap();
+  const initial =
+    boot?.page.kind === "news-list" || boot?.page.kind === "news-detail"
+      ? boot.page.result
+      : undefined;
+  const request = useRead<any>(
+    initial
+      ? null
+      : slug
+        ? `/api/news/${encodeURIComponent(slug)}`
+        : `/api/news?${params}`,
+  );
+  const result = initial || request.data,
+    error = request.error;
   return (
     <>
       <header className="site-header">
@@ -94,9 +118,12 @@ export default function News() {
           {slug ? "← Semua berita" : "← Beranda"}
         </a>
         {error ? (
-          <h1>{error}</h1>
+          <LoadError message={error} onRetry={request.reload} />
         ) : !result ? (
-          <p role="status">Memuat berita…</p>
+          <Skeleton
+            kind={slug ? "article" : "cards"}
+            label="Menyiapkan berita…"
+          />
         ) : slug ? (
           <ArticleView article={result} />
         ) : (
@@ -144,7 +171,12 @@ export default function News() {
       <footer className="container news-footer">
         © {new Date().getFullYear()} {portal.identity.name} · Part of{" "}
         {portal.identity.parentName}
-        <p>{portal.seo.region}, {portal.seo.country} · <a href={`mailto:${portal.seo.contactEmail}`}>{portal.seo.contactEmail}</a></p>
+        <p>
+          {portal.seo.region}, {portal.seo.country} ·{" "}
+          <a href={`mailto:${portal.seo.contactEmail}`}>
+            {portal.seo.contactEmail}
+          </a>
+        </p>
       </footer>
     </>
   );

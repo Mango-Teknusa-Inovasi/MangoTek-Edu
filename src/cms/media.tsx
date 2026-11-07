@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { uploadImage } from "./client";
+import { Skeleton } from "../components/loading/Loading";
 export interface MediaAsset {
   id: string;
   url: string;
@@ -22,6 +23,9 @@ const MediaContext = createContext<{
   assets: MediaAsset[];
   add: (asset: MediaAsset) => void;
   pending: number;
+  loading?: boolean;
+  error?: string;
+  retry?: () => void;
   begin: () => () => void;
 }>({ assets: [], add: () => {}, pending: 0, begin: () => () => {} });
 export const useMediaPending = () => useContext(MediaContext).pending > 0;
@@ -29,10 +33,16 @@ export function MediaProvider({
   assets,
   add,
   children,
+  loading,
+  error,
+  retry,
 }: {
   assets: MediaAsset[];
   add: (asset: MediaAsset) => void;
   children: ReactNode;
+  loading?: boolean;
+  error?: string;
+  retry?: () => void;
 }) {
   const [pending, setPending] = useState(0);
   const begin = useCallback(() => {
@@ -46,7 +56,9 @@ export function MediaProvider({
     };
   }, []);
   return (
-    <MediaContext.Provider value={{ assets, add, pending, begin }}>
+    <MediaContext.Provider
+      value={{ assets, add, pending, begin, loading, error, retry }}
+    >
       {children}
     </MediaContext.Provider>
   );
@@ -89,7 +101,14 @@ export function MediaField({
   onChange: (url: string) => void;
   disabled?: boolean;
 }) {
-  const { assets, add, begin } = useContext(MediaContext);
+  const {
+    assets,
+    add,
+    begin,
+    loading,
+    error: libraryError,
+    retry,
+  } = useContext(MediaContext);
   const id = useId(),
     input = useRef<HTMLInputElement>(null),
     dialog = useRef<HTMLDialogElement>(null),
@@ -316,6 +335,17 @@ export function MediaField({
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
+        {loading && (
+          <Skeleton kind="media" label="Menyiapkan pustaka gambar…" />
+        )}
+        {libraryError && (
+          <p role="alert">
+            Pustaka belum dapat dimuat.{" "}
+            <button type="button" onClick={retry}>
+              Coba lagi pustaka
+            </button>
+          </p>
+        )}
         <div className="media-picker-grid">
           {choices.map((asset) => (
             <button
@@ -338,7 +368,7 @@ export function MediaField({
             </button>
           ))}
         </div>
-        {!choices.length && (
+        {!loading && !libraryError && !choices.length && (
           <p className="office-empty">
             Tidak ada gambar yang cocok. Coba nama lain atau unggah gambar baru.
           </p>

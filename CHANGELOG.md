@@ -6,6 +6,31 @@ Notable changes are recorded here. Releases use Semantic Versioning; while the p
 
 No changes yet.
 
+## [0.2.3] - 2026-11-07
+
+### Added
+
+- Centered MangoTek loading indicators, lightweight animation, and reduced-motion alternatives.
+- Skeleton layouts for office content, lists, media, reports, users, and public views when initial data is unavailable.
+- Typed, escaped public bootstrap data that reuses published server results without duplicate initial API requests.
+- Precompressed Brotli/gzip assets and immutable caching for hashed files.
+- Repeatable local performance measurements and loading/failure/accessibility regression tests.
+
+### Changed
+
+- Route code and initial reads start concurrently, while usable server-rendered public content remains visible until the client is ready.
+- Server validation schemas are excluded from client bundles; office-specific CSS loads only with office.
+- Session, document, and media loading are independent, with preserved drafts and existing filter results during refresh.
+- GET requests time out after 20 seconds and loading feedback expands after 10 seconds; mutations are not retried automatically.
+- Public news filtering and pagination share a single selector between server HTML, bootstrap data, and the API.
+
+### Verification
+
+- Median cold mobile measurements on the same local profile improved from 1.140s to 0.516s FCP and 5.540s to 3.540s LCP; CLS remained 0.0098.
+- Measured resource transfer fell from 1,702,068 to 573,120 bytes and initial public API reads fell from three to zero.
+- These are local headless Chrome measurements, not production field metrics. See [performance notes](docs/PERFORMANCE.md).
+- No new database migration is required. Installations older than 0.2.2 still require the existing media migration.
+
 ## [0.2.2] - 2026-11-06
 
 ### Added

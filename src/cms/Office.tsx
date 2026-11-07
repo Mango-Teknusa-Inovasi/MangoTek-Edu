@@ -1,5 +1,10 @@
+import { services as officeServices } from "../data/content";
+import { mediaKinds } from "./options";
 import { useEffect, useState, type FormEvent } from "react";
-import { api, send } from "./client";
+import { api, send, ApiError } from "./client";
+import "./office.css";
+import { useRead } from "./useRead";
+import { Loading, Skeleton, LoadError } from "../components/loading/Loading";
 import {
   MediaField,
   MediaProvider,
@@ -7,14 +12,12 @@ import {
   type MediaAsset,
 } from "./media";
 import {
-  defaultPortal,
-  mediaKinds,
   type DocumentRecord,
   type Article,
   type Product,
   type PortalContent,
 } from "./schema";
-type User = {
+export type User = {
   id: string;
   name: string;
   email: string;
@@ -756,8 +759,7 @@ function Inquiries({
   report: boolean;
   onError: (s: string) => void;
 }) {
-  const [rows, setRows] = useState<any[]>([]),
-    [filters, setFilters] = useState({
+  const [filters, setFilters] = useState({
       from: "",
       to: "",
       status: "",
@@ -766,17 +768,9 @@ function Inquiries({
     [selected, setSelected] = useState<any>(null),
     [busy, setBusy] = useState(false);
   const query = new URLSearchParams(filters).toString();
-  const load = (signal?: AbortSignal) =>
-    api(`/api/office/inquiries?${query}`, { signal })
-      .then(setRows)
-      .catch((e) => {
-        if (!signal?.aborted) onError(e.message);
-      });
-  useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-  }, [query]);
+  const request = useRead<any[]>(`/api/office/inquiries?${query}`),
+    rows = request.data || [];
+  const load = async () => request.reload();
   return (
     <>
       <div className="office-filters">
@@ -799,6 +793,7 @@ function Inquiries({
         <label>
           Status
           <select
+            aria-label="Status"
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
           >
@@ -819,7 +814,7 @@ function Inquiries({
             }
           >
             <option value="">Semua layanan</option>
-            {defaultPortal.services.map((s) => (
+            {officeServices.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.label}
               </option>
@@ -827,7 +822,19 @@ function Inquiries({
           </select>
         </label>
       </div>
-      {report && (
+      {request.error && (
+        <LoadError message={request.error} onRetry={request.reload} />
+      )}
+      {request.pending && !request.data && (
+        <Skeleton
+          kind={report ? "report" : "list"}
+          label="Menyiapkan permintaan sekolah…"
+        />
+      )}
+      {request.pending && request.data && (
+        <Loading inline label="Memperbarui hasil…" />
+      )}
+      {report && request.data && (
         <>
           <div className="report-totals">
             <div>
@@ -843,7 +850,7 @@ function Inquiries({
           </div>
           <h2>Menurut layanan</h2>
           <ul className="service-report">
-            {defaultPortal.services.map((s) => (
+            {officeServices.map((s) => (
               <li key={s.id}>
                 {s.label}
                 <strong>
@@ -864,30 +871,32 @@ function Inquiries({
           </p>
         </>
       )}
-      <div className="office-list">
-        {!rows.length ? (
-          <p>Belum ada permintaan pada filter ini.</p>
-        ) : (
-          rows.map((r) => (
-            <button
-              className="list-row"
-              key={r.id}
-              onClick={() => setSelected({ ...r })}
-            >
-              <span>
-                <strong>{r.organization}</strong>
-                <small>
-                  {r.name} ·{" "}
-                  {new Date(r.created_at).toLocaleString("id-ID", {
-                    timeZone: "Asia/Jakarta",
-                  })}
-                </small>
-              </span>
-              <StatusBadge status={r.status} />
-            </button>
-          ))
-        )}
-      </div>
+      {request.data && (
+        <div className="office-list" aria-busy={request.pending}>
+          {!rows.length ? (
+            <p>Belum ada permintaan pada filter ini.</p>
+          ) : (
+            rows.map((r) => (
+              <button
+                className="list-row"
+                key={r.id}
+                onClick={() => setSelected({ ...r })}
+              >
+                <span>
+                  <strong>{r.organization}</strong>
+                  <small>
+                    {r.name} ·{" "}
+                    {new Date(r.created_at).toLocaleString("id-ID", {
+                      timeZone: "Asia/Jakarta",
+                    })}
+                  </small>
+                </span>
+                <StatusBadge status={r.status} />
+              </button>
+            ))
+          )}
+        </div>
+      )}
       {selected && (
         <section className="inquiry-detail">
           <div className="office-heading">
@@ -906,7 +915,7 @@ function Inquiries({
               {selected.services
                 .map(
                   (id: string) =>
-                    defaultPortal.services.find((s) => s.id === id)?.label,
+                    officeServices.find((s) => s.id === id)?.label,
                 )
                 .join(", ")}
             </dd>
@@ -996,14 +1005,9 @@ function Inquiries({
   );
 }
 function Users({ onError }: { onError: (s: string) => void }) {
-  const [users, setUsers] = useState<User[]>([]);
-  const load = () =>
-    api("/api/office/users")
-      .then(setUsers)
-      .catch((e) => onError(e.message));
-  useEffect(() => {
-    load();
-  }, []);
+  const request = useRead<User[]>("/api/office/users"),
+    users = request.data || [];
+  const load = request.reload;
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -1051,6 +1055,12 @@ function Users({ onError }: { onError: (s: string) => void }) {
         <button className="button button-green">Tambah pengguna</button>
       </form>
       <h2>Akun portal</h2>
+      {request.error && (
+        <LoadError message={request.error} onRetry={request.reload} />
+      )}
+      {request.pending && !request.data && (
+        <Skeleton kind="users" label="Menyiapkan daftar pengguna…" />
+      )}
       {users.map((u) => (
         <form
           className="user-row"
@@ -1242,17 +1252,18 @@ function Overview({
     </div>
   );
 }
-export default function Office() {
+export default function Office({
+  sessionRequest,
+}: { sessionRequest?: Promise<{ user: User }> } = {}) {
   const [session, setSession] = useState<{ user: User } | null>(null),
     [loading, setLoading] = useState(true),
     [section, setSection] = useState("Ringkasan"),
     [message, setMessage] = useState(""),
-    [docs, setDocs] = useState<DocumentRecord[]>([]),
-    [assets, setAssets] = useState<MediaAsset[]>([]),
     [selected, setSelected] = useState<string | null>(null),
     [newArticle, setNewArticle] = useState(false),
     [busy, setBusy] = useState(false),
-    [dataLoading, setDataLoading] = useState(true),
+    [sessionError, setSessionError] = useState(""),
+    [sessionAttempt, setSessionAttempt] = useState(0),
     [dirty, setDirty] = useState(false),
     [search, setSearch] = useState(""),
     [statusFilter, setStatusFilter] = useState("");
@@ -1272,24 +1283,55 @@ export default function Office() {
     setMessage("");
     window.scrollTo({ top: 0, behavior: "instant" });
   };
-  const load = () =>
-    Promise.all([api("/api/office/documents"), api("/api/office/media")])
-      .then(([d, m]) => {
-        setDocs(d);
-        setAssets(m);
+  const documentRead = useRead<DocumentRecord[]>(
+    session ? "/api/office/documents" : null,
+  );
+  const mediaRead = useRead<MediaAsset[]>(session ? "/api/office/media" : null);
+  const dataLoading = !!session && !documentRead.data && !documentRead.error;
+  const mediaLoading = !!session && !mediaRead.data && !mediaRead.error;
+  const docs = documentRead.data || [],
+    assets = mediaRead.data || [],
+    setDocs = documentRead.setData,
+    setAssets = mediaRead.setData;
+  const load = () => {
+    documentRead.reload();
+    mediaRead.reload();
+  };
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setSessionError("");
+    const request =
+      sessionAttempt === 0 && sessionRequest
+        ? sessionRequest
+        : api<{ user: User }>("/api/office/session");
+    request
+      .then((value) => {
+        if (active) setSession(value);
       })
-      .catch((e) => setMessage(e.message))
-      .finally(() => setDataLoading(false));
-  useEffect(() => {
-    api("/api/office/session")
-      .then(setSession)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-  useEffect(() => {
-    if (session) load();
-  }, [session]);
-  if (loading) return <p className="loading-page">Memuat office…</p>;
+      .catch((error) => {
+        if (active) {
+          if (error instanceof ApiError && error.status === 401)
+            setSession(null);
+          else setSessionError(error.message);
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionAttempt, sessionRequest]);
+  if (loading) return <Loading full label="Memeriksa sesi…" />;
+  if (sessionError)
+    return (
+      <LoadError
+        full
+        message={sessionError}
+        onRetry={() => setSessionAttempt((n) => n + 1)}
+      />
+    );
   if (!session)
     return (
       <main className="office-login">
@@ -1374,10 +1416,13 @@ export default function Office() {
   return (
     <MediaProvider
       assets={assets}
+      loading={mediaLoading}
+      error={mediaRead.error}
+      retry={mediaRead.reload}
       add={(asset) =>
         setAssets((current) => [
           asset,
-          ...current.filter((a) => a.id !== asset.id),
+          ...(current || []).filter((a) => a.id !== asset.id),
         ])
       }
     >
@@ -1444,12 +1489,40 @@ export default function Office() {
               {message}
             </p>
           )}
-          {dataLoading && (
-            <div className="office-loading" role="status">
-              Memuat ruang kerja…
+          {documentRead.error && (
+            <LoadError
+              message={documentRead.error}
+              onRetry={documentRead.reload}
+            />
+          )}
+          {mediaRead.error && (
+            <div className="office-notice" role="status">
+              Pustaka gambar belum dapat dimuat.{" "}
+              <button type="button" onClick={mediaRead.reload}>
+                Coba lagi pustaka
+              </button>
             </div>
           )}
-          {section === "Ringkasan" && !dataLoading && (
+          {dataLoading &&
+            [
+              "Ringkasan",
+              "Konten Portal",
+              "Pengaturan",
+              "Berita",
+              "Produk",
+            ].includes(section) && (
+              <Skeleton
+                kind={
+                  section === "Ringkasan"
+                    ? "overview"
+                    : section === "Konten Portal" || section === "Pengaturan"
+                      ? "editor"
+                      : "list"
+                }
+                label="Menyiapkan konten ruang kerja…"
+              />
+            )}
+          {section === "Ringkasan" && !dataLoading && !documentRead.error && (
             <Overview
               docs={docs}
               admin={admin}
@@ -1458,7 +1531,8 @@ export default function Office() {
             />
           )}
           {(section === "Konten Portal" || section === "Pengaturan") &&
-            record && (
+            record &&
+            !dataLoading && (
               <ContentEditor
                 key={`${section}-${record.id}`}
                 record={record}
@@ -1469,12 +1543,14 @@ export default function Office() {
                 onDirtyChange={setDirty}
                 onSaved={(saved) =>
                   setDocs((current) =>
-                    current.map((d) => (d.id === saved.id ? saved : d)),
+                    (current || []).map((d) => (d.id === saved.id ? saved : d)),
                   )
                 }
               />
             )}
           {(section === "Berita" || section === "Produk") &&
+            !dataLoading &&
+            !documentRead.error &&
             (record ? (
               <>
                 <button
@@ -1504,7 +1580,9 @@ export default function Office() {
                   onDirtyChange={setDirty}
                   onSaved={(saved) =>
                     setDocs((current) =>
-                      current.map((d) => (d.id === saved.id ? saved : d)),
+                      (current || []).map((d) =>
+                        d.id === saved.id ? saved : d,
+                      ),
                     )
                   }
                   refresh={() => {
@@ -1629,7 +1707,10 @@ export default function Office() {
                   {busy ? "Mengunggah…" : "Unggah gambar"}
                 </button>
               </form>
-              <div className="media-library">
+              {mediaLoading && (
+                <Skeleton kind="media" label="Menyiapkan pustaka gambar…" />
+              )}
+              <div className="media-library" aria-busy={mediaLoading}>
                 {assets.map((a) => (
                   <figure key={a.id}>
                     <img src={a.url} alt={a.name} />

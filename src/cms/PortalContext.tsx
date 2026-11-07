@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
-import { defaultPortal, type PortalContent } from "./schema";
-const Context = createContext(defaultPortal);
-export const usePortal = () => useContext(Context);
+import type { PortalContent } from "./schema";
+const Context = createContext<PortalContent | null>(null);
+export const usePortal = () => {
+  const value = useContext(Context);
+  if (!value) throw Error("PortalProvider is required.");
+  return value;
+};
 export function useServiceHref() {
   const { sections } = usePortal();
   return sections.find((s) => s.id === "layanan")?.visible

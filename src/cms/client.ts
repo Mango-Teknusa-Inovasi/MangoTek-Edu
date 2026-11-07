@@ -1,3 +1,12 @@
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
 let csrf = "";
 export async function api<T = any>(
   path: string,
@@ -7,17 +16,55 @@ export async function api<T = any>(
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
   if (csrf) headers.set("X-CSRF-Token", csrf);
-  const response = await fetch(path, {
-    ...options,
-    headers,
-    credentials: "same-origin",
-  });
-  const result = await response
-    .json()
-    .catch(() => ({ error: "Server belum dapat dijangkau." }));
-  if (!response.ok) throw Error(result.error || "Permintaan gagal.");
-  if (result.csrf) csrf = result.csrf;
-  return result;
+  const read =
+    !options.method || ["GET", "HEAD"].includes(options.method.toUpperCase());
+  const controller = new AbortController();
+  let timedOut = false;
+  const abort = () => controller.abort();
+  options.signal?.addEventListener("abort", abort, { once: true });
+  if (options.signal?.aborted) controller.abort();
+  const timer = read
+    ? setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, 20000)
+    : undefined;
+  try {
+    const response = await fetch(path, {
+      ...options,
+      headers,
+      credentials: "same-origin",
+      signal: read ? controller.signal : options.signal,
+    });
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new ApiError(
+        "Server mengembalikan respons yang belum dapat dibaca. Silakan coba lagi.",
+        502,
+      );
+    }
+    if (!response.ok)
+      throw new ApiError(result.error || "Permintaan gagal.", response.status);
+    if (result.csrf) csrf = result.csrf;
+    return result;
+  } catch (error) {
+    if (timedOut)
+      throw new ApiError(
+        "Server belum merespons. Periksa koneksi Anda dan coba lagi.",
+        408,
+      );
+    if (error instanceof TypeError && !options.signal?.aborted)
+      throw new ApiError(
+        "Koneksi terputus. Periksa koneksi Anda dan coba lagi.",
+        0,
+      );
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", abort);
+  }
 }
 export const send = (method: string, body?: unknown): RequestInit => ({
   method,

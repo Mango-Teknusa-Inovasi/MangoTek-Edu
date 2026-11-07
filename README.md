@@ -112,3 +112,5 @@ Original project code is available under the [MIT License](LICENSE). Contributio
 MangoTek names and logos identify this project and its organization. The software license does not grant trademark rights or imply endorsement of derivative deployments.
 
 Image uploads support local storage or a private S3/R2 bucket. See [media storage and Portainer upgrade instructions](docs/MEDIA-STORAGE.md). Existing installations must run the new media migration after upgrading.
+
+Loading behavior and measured local before/after results are documented in [performance notes](docs/PERFORMANCE.md). Public HTML carries only published bootstrap data; office sessions and private reads remain uncached.

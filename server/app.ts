@@ -10,7 +10,9 @@ import sharp from "sharp";
 import { z } from "zod";
 import { db, now } from "./db";
 import { registerPublicPages } from "./public-pages";
-import { shell } from "./seo";
+import { shell, publications } from "./seo";
+import { selectNews } from "./public-data";
+import type { PublishedArticle } from "../src/cms/bootstrap";
 import {
   documentRecord as doc,
   documents,
@@ -220,28 +222,10 @@ app.get("/api/portal", async (c) => {
   return c.json(portalSchema.parse(JSON.parse(row.published)));
 });
 async function news(query: Record<string, string>) {
-  const page = Math.max(1, Math.min(10000, Math.floor(Number(query.page) || 1)));
-  const rows = await db("documents")
-    .where({ kind: "article" })
-    .whereNotNull("published")
-    .orderBy("published_at", "desc");
-  const all = rows.map((r) => ({
-    id: r.id,
-    ...JSON.parse(r.published),
-    publishedAt: r.published_at,
-  }));
-  const q = (query.q || "").slice(0, 200).toLocaleLowerCase("id");
-  const filtered = all.filter(
-    (a) =>
-      (!query.category || a.category === query.category) &&
-      (!q || `${a.title} ${a.summary}`.toLocaleLowerCase("id").includes(q)),
+  return selectNews(
+    (await publications("article")) as PublishedArticle[],
+    query,
   );
-  return {
-    items: filtered.slice((page - 1) * 9, page * 9),
-    total: filtered.length,
-    page,
-    categories: [...new Set(all.map((a) => a.category))],
-  };
 }
 app.get("/api/news", async (c) => c.json(await news(c.req.query())));
 app.get("/api/news/:slug", async (c) => {
@@ -262,7 +246,9 @@ app.get("/api/office/documents", async (c) =>
 app.post("/api/office/documents", async (c) => {
   const body = await c.req.json();
   const kind = body.kind === "product" ? "product" : "article";
-  const value = (kind === "product" ? productSchema : articleSchema).parse(body);
+  const value = (kind === "product" ? productSchema : articleSchema).parse(
+    body,
+  );
   const id = randomUUID();
   await db.transaction(async (trx) => {
     await lockContent(trx);
@@ -291,7 +277,9 @@ app.put("/api/office/documents/:id", async (c) => {
     const value =
       row.kind === "portal"
         ? portalSchema.parse(body.content)
-        : row.kind === "product" ? productSchema.parse(body.content) : articleSchema.parse(body.content);
+        : row.kind === "product"
+          ? productSchema.parse(body.content)
+          : articleSchema.parse(body.content);
     if (row.kind === "portal" && c.get("user").role !== "admin") {
       const old = portalSchema.parse(JSON.parse(row.draft)) as any;
       for (const field of ["identity", "theme", "navigation", "seo"])
@@ -370,7 +358,11 @@ app.post("/api/office/documents/:id/:action", async (c) => {
   });
 });
 app.get("/api/office/media", async (c) =>
-  c.json(await db("media").select("id", "url", "name", "size", "width", "height", "created_at").orderBy("created_at", "desc")),
+  c.json(
+    await db("media")
+      .select("id", "url", "name", "size", "width", "height", "created_at")
+      .orderBy("created_at", "desc"),
+  ),
 );
 app.post("/api/office/media", async (c) => {
   const body = await c.req.parseBody();
@@ -394,7 +386,9 @@ app.post("/api/office/media", async (c) => {
       })
       .webp({ quality: 85 })
       .toBuffer({ resolveWithObject: true });
-    result = output.data; width = output.info.width; height = output.info.height;
+    result = output.data;
+    width = output.info.width;
+    height = output.info.height;
   } catch {
     throw fail("Format gambar harus JPEG, PNG, atau WebP yang valid.");
   }
@@ -407,14 +401,28 @@ app.post("/api/office/media", async (c) => {
       url,
       name: file.name.slice(0, 180),
       size: result.length,
-      width, height, ...location,
+      width,
+      height,
+      ...location,
       created_at: now(),
     });
   } catch (e) {
-    await imageStorage.remove(`${id}.webp`, location).catch(() => { console.error("[media] Failed to clean up unregistered object", id); });
+    await imageStorage.remove(`${id}.webp`, location).catch(() => {
+      console.error("[media] Failed to clean up unregistered object", id);
+    });
     throw e;
   }
-  return c.json({ id, url, name: file.name.slice(0, 180), size: result.length, width, height }, 201);
+  return c.json(
+    {
+      id,
+      url,
+      name: file.name.slice(0, 180),
+      size: result.length,
+      width,
+      height,
+    },
+    201,
+  );
 });
 app.delete("/api/office/media/:id", async (c) => {
   admin(c);
@@ -643,13 +651,16 @@ app.get("/health", async (c) => {
 app.get("/uploads/:file", async (c) => {
   const file = c.req.param("file");
   if (!/^[a-f0-9-]{36}\.webp$/.test(file)) return c.notFound();
-  const row = await db("media").where({ url: `/uploads/${file}` }).first();
+  const row = await db("media")
+    .where({ url: `/uploads/${file}` })
+    .first();
   if (!row) return c.notFound();
   try {
     const object = await imageStorage.get(file, row);
     c.header("Content-Type", "image/webp");
     c.header("Cache-Control", "public, max-age=31536000, immutable");
-    if (object.size !== undefined) c.header("Content-Length", String(object.size));
+    if (object.size !== undefined)
+      c.header("Content-Length", String(object.size));
     return c.body(object.body);
   } catch (error: any) {
     if (error.code === "ENOENT" || error.status === 404) return c.notFound();
@@ -660,7 +671,13 @@ registerPublicPages(app);
 app.get("/office", async (c) => {
   c.header("Cache-Control", "no-store");
   c.header("X-Robots-Tag", "noindex, nofollow");
-  return c.html(await shell({ title: "Office | MangoTek Edu", path: "/office", noindex: true }));
+  return c.html(
+    await shell({
+      title: "Office | MangoTek Edu",
+      path: "/office",
+      noindex: true,
+    }),
+  );
 });
 app.get("/office/preview/:id", async (c) => {
   c.header("Cache-Control", "no-store");
@@ -671,7 +688,22 @@ app.get("/office/preview/:id", async (c) => {
     .first();
   if (!s || !(await db("users").where({ id: s.user_id, active: true }).first()))
     return c.redirect("/office");
-  return c.html(await shell({ title: "Pratinjau konten | MangoTek Edu", path: c.req.path, noindex: true }));
+  return c.html(
+    await shell({
+      title: "Pratinjau konten | MangoTek Edu",
+      path: c.req.path,
+      noindex: true,
+    }),
+  );
 });
-app.use("*", serveStatic({ root: "./dist" }));
+app.use("/assets/*", async (c, next) => {
+  await next();
+  c.header("Vary", "Accept-Encoding");
+  if (
+    c.res.ok &&
+    /^\/assets\/[^/]+-[a-zA-Z0-9_-]+\.(?:js|css|woff2)$/.test(c.req.path)
+  )
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+});
+app.use("*", serveStatic({ root: "./dist", precompressed: true }));
 app.notFound((c) => c.text("Halaman tidak ditemukan", 404));

@@ -78,3 +78,5 @@ SEO tests use their own temporary SQLite database. They cover public HTML, metad
 - [Google: Organization structured data](https://developers.google.com/search/docs/appearance/structured-data/organization)
 - [Google: Sitemap overview](https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview)
 - [The llms.txt proposal](https://llmstxt.org/)
+
+Public HTML includes an escaped, inert JSON bootstrap containing the published portal configuration and the published data needed by that page. The client reuses it instead of immediately fetching the same records again. As with the existing public portal API, section visibility controls rendered content; hidden fields in an already published configuration are not a confidentiality boundary. Draft revisions and office/session/inquiry data are not embedded. Public HTML revalidates, while hashed static assets use immutable cache headers and negotiated Brotli/gzip variants.
