@@ -54,7 +54,7 @@
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.7"
   },
   "description": "An education portal and editorial workspace with interactive 3D media, news publishing, and school consultation management.",
   "license": "MIT",
