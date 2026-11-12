@@ -24,7 +24,7 @@
     "perf": "node scripts/performance.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1163.0",
+    "@aws-sdk/client-s3": "^3.1164.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@hono/node-server": "^2.1.6",
